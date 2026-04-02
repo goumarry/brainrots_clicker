@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>BrainrotClicker</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      #game-container {
+        width: 100%;
+        height: 100%;
+      }
+
+      canvas {
+        display: block;
+        width: 100% !important;
+        height: 100% !important;
+      }
+
+      #loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #ffffff;
+        font-size: 24px;
+        text-align: center;
+        z-index: 10;
+      }
+    </style>
+    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+  </head>
+  <body>
+    <div id="game-container">
+      <div id="loading">Loading BrainrotClicker...</div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
