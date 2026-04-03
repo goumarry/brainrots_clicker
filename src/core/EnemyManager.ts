@@ -2,11 +2,13 @@ import { Decimal, toBigNum } from '../systems/BigNumber';
 import { GameState } from './GameState';
 import { EventBus, Events } from '../systems/EventBus';
 import { BalanceConfig } from '../config/BalanceConfig';
+import { HERO_DATA } from '../config/HeroData';
 import { GoldManager } from './GoldManager';
 import { ZoneManager } from './ZoneManager';
-import { QuestManager } from './QuestManager';
 import { RelicManager } from './RelicManager';
 import { AchievementManager } from './AchievementManager';
+import { HeroManager } from './HeroManager';
+import { AudioManager } from '../systems/AudioManager';
 import { CrazyGamesSDK } from '../integrations/CrazyGamesSDK';
 
 const ENEMY_NAMES_BY_ZONE: string[][] = [
@@ -37,6 +39,13 @@ const BOSS_NAMES = [
 
 function getEnemyName(zone: number, isBoss: boolean): string {
   if (isBoss) {
+    // Special Brainrot Bosses at Zone 1 and every 10 zones (10, 20, 30...)
+    if (zone === 1 || zone % 10 === 0) {
+      const heroIndex = zone === 1 ? 1 : (zone / 10) + 1;
+      if (HERO_DATA[heroIndex]) {
+        return HERO_DATA[heroIndex].name;
+      }
+    }
     const bossIndex = Math.floor((zone - 1) / BalanceConfig.BOSS_ZONE_INTERVAL);
     return BOSS_NAMES[Math.min(bossIndex, BOSS_NAMES.length - 1)];
   }
@@ -48,8 +57,9 @@ function getEnemyName(zone: number, isBoss: boolean): string {
 export const EnemyManager = {
   spawnEnemy(): void {
     const zone = GameState.zone;
-    const isBoss = zone % BalanceConfig.BOSS_ZONE_INTERVAL === 0 &&
-      GameState.enemyKillCount >= BalanceConfig.ENEMIES_PER_ZONE;
+    // Zone 1 is a Boss Zone (at mob 10), then every 5 zones as before
+    const isBossZone = zone === 1 || zone % BalanceConfig.BOSS_ZONE_INTERVAL === 0;
+    const isBoss = isBossZone && GameState.enemyKillCount >= BalanceConfig.ENEMIES_PER_ZONE;
     const maxHP = isBoss
       ? BalanceConfig.bossHP(zone - 1)
       : BalanceConfig.enemyHP(zone - 1);
@@ -73,7 +83,9 @@ export const EnemyManager = {
 
   dealDamage(amount: Decimal): void {
     const enemy = GameState.currentEnemy;
-    enemy.currentHP = enemy.currentHP.sub(amount);
+    // Clamp damage so HP doesn't go negative
+    const actualDamage = Decimal.min(amount, enemy.currentHP);
+    enemy.currentHP = enemy.currentHP.sub(actualDamage);
 
     EventBus.emit(Events.ENEMY_DAMAGED, amount, enemy.currentHP, enemy.maxHP);
 
@@ -97,8 +109,7 @@ export const EnemyManager = {
     const goldEarned = GoldManager.awardKillGold(zone, isBoss);
     EventBus.emit(Events.ENEMY_DIED, goldEarned, isBoss);
 
-    // Quest progress
-    QuestManager.updateProgress('total_kills', 1);
+    AudioManager.playDeathSound();
 
     // Relic drop
     RelicManager.tryDropRelic(isBoss);
@@ -110,6 +121,13 @@ export const EnemyManager = {
       GameState.bossTimerActive = false;
       GameState.bossTimeRemaining = 0;
       GameState.enemyKillCount = 0;
+
+      // Unlock new hero if it's Zone 1 or a deca-zone (10, 20, 30...)
+      if (zone === 1 || zone % 10 === 0) {
+        const heroIndex = zone === 1 ? 1 : (zone / 10) + 1;
+        HeroManager.unlockHero(heroIndex);
+      }
+
       CrazyGamesSDK.happyTime();
       ZoneManager.advanceZone();
     } else {
@@ -120,7 +138,7 @@ export const EnemyManager = {
 
   checkBossSpawn(): void {
     const zone = GameState.zone;
-    const isBossZone = zone % BalanceConfig.BOSS_ZONE_INTERVAL === 0;
+    const isBossZone = zone === 1 || zone % BalanceConfig.BOSS_ZONE_INTERVAL === 0;
 
     if (GameState.enemyKillCount >= BalanceConfig.ENEMIES_PER_ZONE) {
       if (isBossZone) {

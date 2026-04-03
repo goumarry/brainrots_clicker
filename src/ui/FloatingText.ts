@@ -1,4 +1,5 @@
 import { Container, Text, TextStyle, Ticker } from 'pixi.js';
+import { createTextStyle } from './styles/Typography';
 
 interface FloatingTextInstance {
   text: Text;
@@ -11,41 +12,49 @@ interface FloatingTextInstance {
 export class FloatingTextManager {
   private container: Container;
   private instances: FloatingTextInstance[] = [];
+  private pool: Text[] = [];
+  private static readonly STYLE = createTextStyle({
+    fontSize: 20,
+    fill: 0xffff44,
+    stroke: { color: 0x000000, width: 3 },
+    dropShadow: { color: 0x000000, blur: 2, distance: 1 },
+    padding: 4,
+  });
 
   constructor(container: Container) {
     this.container = container;
   }
 
   spawn(message: string, x: number, y: number, color: number = 0xffff44): void {
-    const style = new TextStyle({
-      fontSize: 20,
-      fontWeight: 'bold',
-      fill: color,
-      stroke: { color: 0x000000, width: 3 },
-      dropShadow: {
-        color: 0x000000,
-        blur: 2,
-        distance: 1,
-      },
-    });
+    if (this.instances.length >= 30) return;
 
-    const text = new Text({ text: message, style });
-    text.anchor.set(0.5, 0.5);
+    let text: Text;
+    if (this.pool.length > 0) {
+      text = this.pool.pop()!;
+      text.visible = true;
+      text.alpha = 1;
+      text.text = message;
+      text.style.fill = color;
+    } else {
+      text = new Text({
+        text: message,
+        style: FloatingTextManager.STYLE,
+        resolution: 2,
+      });
+      text.anchor.set(0.5, 0.5);
+    }
+
     text.x = x + (Math.random() - 0.5) * 40;
     text.y = y;
-    text.alpha = 1;
-
     this.container.addChild(text);
 
-    const instance: FloatingTextInstance = {
+    this.instances.push({
       text,
       vx: (Math.random() - 0.5) * 1.5,
       vy: -2.5 - Math.random() * 1.5,
-      life: 1.0,
-      maxLife: 1.0,
-    };
-
-    this.instances.push(instance);
+      life: 0.8,
+      maxLife: 0.8,
+    });
   }
 
   update(deltaSeconds: number): void {
@@ -54,8 +63,9 @@ export class FloatingTextManager {
       inst.life -= deltaSeconds;
 
       if (inst.life <= 0) {
+        inst.text.visible = false;
         this.container.removeChild(inst.text);
-        inst.text.destroy();
+        this.pool.push(inst.text);
         this.instances.splice(i, 1);
         continue;
       }

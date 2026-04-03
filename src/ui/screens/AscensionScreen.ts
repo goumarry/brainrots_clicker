@@ -1,4 +1,5 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { createTextStyle } from '../styles/Typography';
 import { AscensionManager } from '../../core/AscensionManager';
 import { GameState } from '../../core/GameState';
 import { EnemyManager } from '../../core/EnemyManager';
@@ -40,7 +41,7 @@ export class AscensionScreen {
 
     const bg = new Graphics();
     bg.rect(0, 0, width, height);
-    bg.fill(0x060d16);
+    bg.fill(0x0d1b2a);
     this.container.addChild(bg);
 
     this.scrollContainer = new Container();
@@ -91,21 +92,34 @@ export class AscensionScreen {
 
     let yOffset = 10;
 
-    // Header: Sigma Souls
+    // Header: Sigma Souls & Record
+    const headerStyle = createTextStyle({ fontSize: 18, fill: 0xc39ef8, fontWeight: '800' });
     const soulsText = new Text({
-      text: `🌀 Sigma Souls: ${GameState.sigmaSOuls}`,
-      style: { fontSize: 18, fill: 0xc39ef8, fontWeight: 'bold' }
+      text: `🌀 Sigma Souls: ${GameState.sigmaSouls}`,
+      style: headerStyle,
+      resolution: window.devicePixelRatio || 2,
     });
     soulsText.x = 20;
     soulsText.y = yOffset;
     this.scrollContainer.addChild(soulsText);
-    yOffset += 32;
 
-    // Souls on next ascension
+    const recordText = new Text({
+      text: `🏆 Record: Zone ${GameState.stats.maxZoneEver}`,
+      style: createTextStyle({ fontSize: 16, fill: 0xf1c40f }),
+      resolution: window.devicePixelRatio || 2,
+    });
+    recordText.anchor.set(1, 0);
+    recordText.x = this.panelW - 20;
+    recordText.y = yOffset + 2;
+    this.scrollContainer.addChild(recordText);
+    yOffset += 40;
+
+    // Potential Gain
     const pendingSouls = AscensionManager.getSigmaSoulsReward();
     const pendingText = new Text({
-      text: `Next ascension: +${pendingSouls} souls`,
-      style: { fontSize: 12, fill: 0x8899aa }
+      text: pendingSouls > 0 ? `✨ New rewards: +${pendingSouls} souls` : `⏳ No new rewards reached`,
+      style: createTextStyle({ fontSize: 14, fill: pendingSouls > 0 ? 0x44ff88 : 0x8899aa }),
+      resolution: window.devicePixelRatio || 2,
     });
     pendingText.x = 20;
     pendingText.y = yOffset;
@@ -113,34 +127,38 @@ export class AscensionScreen {
     yOffset += 24;
 
     // Requirement text
+    const canAscend = AscensionManager.canAscend();
+    const milestoneTarget = (Math.floor(GameState.highestZoneAscended / 10) + 1) * 10;
+    
     const reqText = new Text({
-      text: GameState.stats.maxZoneReached >= 100
-        ? `✅ Zone ${GameState.stats.maxZoneReached} reached — can ascend!`
-        : `⚠️ Reach zone 100 to ascend (current max: ${GameState.stats.maxZoneReached})`,
-      style: { fontSize: 11, fill: GameState.stats.maxZoneReached >= 100 ? 0x44ff88 : 0xff8844 }
+      text: canAscend
+        ? `✅ Milestone reached! (Beat Zone ${milestoneTarget})`
+        : `🔒 Goal: Beat Zone ${milestoneTarget} Boss`,
+      style: createTextStyle({ fontSize: 15, fill: canAscend ? 0x44ff88 : 0xff8844, fontWeight: 'bold' }),
+      resolution: window.devicePixelRatio || 2,
     });
     reqText.x = 20;
     reqText.y = yOffset;
     this.scrollContainer.addChild(reqText);
-    yOffset += 28;
+    yOffset += 32;
 
     // Ascend button
-    const canAscend = AscensionManager.canAscend();
     const ascendBtn = new Graphics();
-    ascendBtn.roundRect(20, 0, this.panelW - 40, 44, 8);
+    ascendBtn.roundRect(20, 0, this.panelW - 40, 66, 12);
     ascendBtn.fill(canAscend ? 0x6a35c8 : 0x2a2a3a);
-    ascendBtn.roundRect(20, 0, this.panelW - 40, 44, 8);
-    ascendBtn.stroke({ width: 2, color: canAscend ? 0x9b59b6 : 0x3a3a4a });
+    ascendBtn.roundRect(20, 0, this.panelW - 40, 66, 12);
+    ascendBtn.stroke({ width: 3, color: canAscend ? 0x9b59b6 : 0x3a3a4a });
     ascendBtn.y = yOffset;
     this.scrollContainer.addChild(ascendBtn);
 
     const ascendText = new Text({
       text: `🌀 ASCEND (+${pendingSouls} Sigma Souls)`,
-      style: { fontSize: 14, fill: canAscend ? 0xffffff : 0x555566, fontWeight: 'bold' }
+      style: createTextStyle({ fontSize: 22, fill: canAscend ? 0xffffff : 0x555566, fontWeight: '800', padding: 8 }),
+      resolution: window.devicePixelRatio || 2,
     });
     ascendText.anchor.set(0.5);
     ascendText.x = this.panelW / 2;
-    ascendText.y = yOffset + 22;
+    ascendText.y = yOffset + 33;
     this.scrollContainer.addChild(ascendText);
 
     if (canAscend) {
@@ -153,7 +171,7 @@ export class AscensionScreen {
         }
       });
     }
-    yOffset += 56;
+    yOffset += 78;
 
     // Separator
     yOffset += 8;
@@ -171,12 +189,13 @@ export class AscensionScreen {
 
       const branchLabel = new Text({
         text: BRANCH_LABELS[branch],
-        style: { fontSize: 14, fill: BRANCH_COLORS[branch], fontWeight: 'bold' }
+        style: createTextStyle({ fontSize: 20, fill: BRANCH_COLORS[branch] }),
+        resolution: window.devicePixelRatio || 2,
       });
       branchLabel.x = 20;
       branchLabel.y = yOffset;
       this.scrollContainer.addChild(branchLabel);
-      yOffset += 28;
+      yOffset += 32;
 
       for (const upg of branchUpgrades) {
         const level = AscensionManager.getUpgradeLevel(upg.id);
@@ -185,44 +204,48 @@ export class AscensionScreen {
         const cost = maxed ? 0 : upg.cost * (level + 1);
 
         const cardBg = new Graphics();
-        cardBg.roundRect(20, 0, this.panelW - 40, 52, 6);
+        cardBg.roundRect(20, 0, this.panelW - 40, 78, 8);
         cardBg.fill(0x0d1926);
-        cardBg.roundRect(20, 0, this.panelW - 40, 52, 6);
-        cardBg.stroke({ width: 1, color: maxed ? BRANCH_COLORS[branch] : 0x1e2d3e });
+        cardBg.roundRect(20, 0, this.panelW - 40, 78, 8);
+        cardBg.stroke({ width: 1.5, color: maxed ? BRANCH_COLORS[branch] : 0x1e2d3e });
         cardBg.y = yOffset;
         this.scrollContainer.addChild(cardBg);
 
         const upgName = new Text({
           text: `${upg.name} (${level}/${upg.maxLevel})`,
-          style: { fontSize: 12, fill: maxed ? BRANCH_COLORS[branch] : 0xffffff }
+          style: createTextStyle({ fontSize: 18, fill: maxed ? BRANCH_COLORS[branch] : 0xffffff }),
+          resolution: window.devicePixelRatio || 2,
         });
-        upgName.x = 30;
-        upgName.y = yOffset + 8;
+        upgName.x = 35;
+        upgName.y = yOffset + 12;
         this.scrollContainer.addChild(upgName);
 
         const upgDesc = new Text({
           text: upg.description,
-          style: { fontSize: 10, fill: 0x8899aa }
+          style: createTextStyle({ fontSize: 15, fill: 0x8899aa }),
+          resolution: window.devicePixelRatio || 2,
         });
-        upgDesc.x = 30;
-        upgDesc.y = yOffset + 28;
+        upgDesc.x = 35;
+        upgDesc.y = yOffset + 40;
         this.scrollContainer.addChild(upgDesc);
 
         if (!maxed) {
-          const btnW = 90;
+          const btnW = 120;
+          const btnH = 42;
           const btn = new Graphics();
-          btn.roundRect(this.panelW - 30 - btnW, 14, btnW, 28, 6);
+          btn.roundRect(this.panelW - 35 - btnW, 18, btnW, btnH, 8);
           btn.fill(canAfford ? 0x6a35c8 : 0x1a2332);
           btn.y = yOffset;
           this.scrollContainer.addChild(btn);
 
           const btnText = new Text({
             text: `${cost}🌀`,
-            style: { fontSize: 11, fill: canAfford ? 0xffffff : 0x556677, fontWeight: 'bold' }
+            style: createTextStyle({ fontSize: 16, fill: canAfford ? 0xffffff : 0x556677 }),
+            resolution: window.devicePixelRatio || 2,
           });
           btnText.anchor.set(0.5);
-          btnText.x = this.panelW - 30 - btnW / 2;
-          btnText.y = yOffset + 28;
+          btnText.x = this.panelW - 35 - btnW / 2;
+          btnText.y = yOffset + 18 + btnH / 2;
           this.scrollContainer.addChild(btnText);
 
           if (canAfford) {
@@ -237,15 +260,16 @@ export class AscensionScreen {
         } else {
           const maxedText = new Text({
             text: 'MAX',
-            style: { fontSize: 12, fill: BRANCH_COLORS[branch], fontWeight: 'bold' }
+            style: createTextStyle({ fontSize: 16, fill: BRANCH_COLORS[branch] }),
+            resolution: window.devicePixelRatio || 2,
           });
           maxedText.anchor.set(0.5);
-          maxedText.x = this.panelW - 55;
-          maxedText.y = yOffset + 26;
+          maxedText.x = this.panelW - 65;
+          maxedText.y = yOffset + 39;
           this.scrollContainer.addChild(maxedText);
         }
 
-        yOffset += 58;
+        yOffset += 88;
       }
       yOffset += 8;
     }

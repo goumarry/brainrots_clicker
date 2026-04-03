@@ -1,289 +1,375 @@
-import {
-  Container, Graphics, Text, TextStyle
-} from 'pixi.js';
+import { Container, Graphics, Text, TextStyle, Sprite } from 'pixi.js';
+import { createTextStyle } from './styles/Typography';
+import { formatNumber } from '../systems/NumberFormatter';
 import { Decimal } from '../systems/BigNumber';
-import { formatHP } from '../systems/NumberFormatter';
 import { EventBus, Events } from '../systems/EventBus';
-import { EnemyState } from '../core/GameState';
-import { BalanceConfig } from '../config/BalanceConfig';
 import { GameState } from '../core/GameState';
-
-const DEFAULT_W = 780;
-const DEFAULT_H = 554;
-const ENEMY_COLORS_NORMAL = [
-  0x4a6fa5, 0x5a8a4a, 0x8a4a4a, 0x7a5a8a, 0x4a8a7a,
-];
-const ENEMY_COLORS_BOSS = [
-  0xc0392b, 0x8e44ad, 0xd35400, 0x1a252f, 0x922b21,
-];
+import { HERO_DATA } from '../config/HeroData';
 
 export class EnemyDisplay {
   container: Container;
-  private background: Graphics;
-  private enemyBody: Graphics;
-  private hpBarBg: Graphics;
-  private hpBarFill: Graphics;
-  private enemyNameText: Text;
-  private hpText: Text;
-  private bossTimerBar: Graphics;
-  private bossTimerText: Text;
-  private bossTimerBg: Graphics;
-
-  private shakeTime: number = 0;
-  private shakeIntensity: number = 0;
-  private baseX: number = 0;
-  private baseY: number = 0;
-  private currentColorIndex: number = 0;
-  private isBoss: boolean = false;
   private areaW: number;
   private areaH: number;
 
-  constructor(width: number = DEFAULT_W, height: number = DEFAULT_H) {
+  private enemyIconContainer: Container;
+  private enemyBody: Graphics;
+  private enemyEyes: Graphics;
+  private enemyNameText: Text;
+  private hpText: Text;
+  private hpBar: Graphics;
+  private hpBarBg: Graphics;
+  private mobProgressText: Text;
+  private bossTimerText: Text;
+  private bossTimerBar: Graphics;
+
+  private currentSprite: Sprite | Text | Container | null = null;
+  private floatOffset: number = 0;
+  private floatTime: number = 0;
+
+  constructor(width: number, height: number) {
     this.areaW = width;
     this.areaH = height;
     this.container = new Container();
 
-    // Background
-    this.background = new Graphics();
-    this.background.roundRect(0, 0, this.areaW, this.areaH, 12);
-    this.background.fill(0x0d1b2a);
-    this.background.stroke({ color: 0x1e3a5f, width: 2 });
-    this.container.addChild(this.background);
+    // Background for the rectangular combat zone (Matches full area)
+    const mainBg = new Graphics();
+    mainBg.roundRect(0, 0, width, height, 15);
+    mainBg.fill({ color: 0x0a1422, alpha: 0.6 });
+    mainBg.stroke({ color: 0x1e3a5f, width: 2 });
+    this.container.addChild(mainBg);
 
-    // Enemy body (colored rectangle representing enemy)
+    // Enemy Sprite/Emoji Container (Centered)
+    this.enemyIconContainer = new Container();
+    this.enemyIconContainer.x = Math.floor(width / 2);
+    this.enemyIconContainer.y = Math.floor(height / 2 - 20);
+    this.container.addChild(this.enemyIconContainer);
+
     this.enemyBody = new Graphics();
-    this.container.addChild(this.enemyBody);
+    this.enemyIconContainer.addChild(this.enemyBody);
 
-    // Enemy name text
-    const nameStyle = new TextStyle({
-      fontSize: 22,
-      fontWeight: 'bold',
-      fill: 0xffffff,
-      stroke: { color: 0x000000, width: 3 },
-    });
-    this.enemyNameText = new Text({ text: 'Enemy', style: nameStyle });
-    this.enemyNameText.anchor.set(0.5, 0);
-    this.enemyNameText.x = this.areaW / 2;
-    this.enemyNameText.y = 14;
-    this.container.addChild(this.enemyNameText);
+    this.enemyEyes = new Graphics();
+    this.enemyIconContainer.addChild(this.enemyEyes);
 
-    // HP bar background
-    const hpBarY = this.areaH - 60;
-    const hpBarX = 20;
-    const hpBarW = this.areaW - 40;
-    const hpBarH = 22;
+    // HP Bar setup
+    const barW = Math.floor(width * 0.6);
+    const barH = 33; // Increased from 22
+    const barX = Math.floor((width - barW) / 2);
+    const barY = Math.floor(height - 85); // Shifted up slightly
 
     this.hpBarBg = new Graphics();
-    this.hpBarBg.roundRect(hpBarX, hpBarY, hpBarW, hpBarH, 4);
-    this.hpBarBg.fill(0x1a1a2e);
-    this.hpBarBg.stroke({ color: 0x333355, width: 1 });
+    this.hpBarBg.roundRect(barX, barY, barW, barH, 4);
+    this.hpBarBg.fill(0x1a1a1a);
     this.container.addChild(this.hpBarBg);
 
-    this.hpBarFill = new Graphics();
-    this.container.addChild(this.hpBarFill);
+    this.hpBar = new Graphics();
+    this.container.addChild(this.hpBar);
 
-    // HP text
-    const hpStyle = new TextStyle({
-      fontSize: 13,
-      fill: 0xffffff,
-      fontWeight: 'bold',
+    // HP Text
+    this.hpText = new Text({
+      text: '',
+      style: createTextStyle({ 
+        fontSize: 20, 
+        fill: 0xffffff, 
+        stroke: { color: 0x000000, width: 2.5 },
+        padding: 8 
+      }),
+      resolution: window.devicePixelRatio || 2,
     });
-    this.hpText = new Text({ text: '', style: hpStyle });
     this.hpText.anchor.set(0.5, 0.5);
-    this.hpText.x = this.areaW / 2;
-    this.hpText.y = hpBarY + hpBarH / 2;
+    this.hpText.x = Math.floor(width / 2);
+    this.hpText.y = Math.floor(barY + barH / 2);
     this.container.addChild(this.hpText);
 
-    // Boss timer bar
-    this.bossTimerBg = new Graphics();
-    this.bossTimerBg.roundRect(hpBarX, hpBarY - 30, hpBarW, 18, 4);
-    this.bossTimerBg.fill(0x1a1a2e);
-    this.bossTimerBg.stroke({ color: 0x553333, width: 1 });
-    this.bossTimerBg.visible = false;
-    this.container.addChild(this.bossTimerBg);
+    // Enemy Name
+    this.enemyNameText = new Text({
+      text: '',
+      style: createTextStyle({ 
+        fontSize: 26, 
+        fill: 0xffffff, 
+        fontWeight: '900', 
+        stroke: { color: 0x000000, width: 4 },
+        padding: 10 
+      }),
+      resolution: window.devicePixelRatio || 2,
+    });
+    this.enemyNameText.anchor.set(0.5, 0);
+    this.enemyNameText.x = Math.floor(width / 2);
+    this.enemyNameText.y = 15; // Shifted up slightly for 90px header balance
+    this.container.addChild(this.enemyNameText);
+
+    // Mob Progress (Mob 3/10)
+    this.mobProgressText = new Text({
+      text: '',
+      style: createTextStyle({ 
+        fontSize: 18, 
+        fill: 0x7ec8e3, 
+        padding: 8 
+      }),
+      resolution: window.devicePixelRatio || 2,
+    });
+    this.mobProgressText.anchor.set(1, 0);
+    this.mobProgressText.x = width - 40;
+    this.mobProgressText.y = 20;
+    this.container.addChild(this.mobProgressText);
 
     this.bossTimerBar = new Graphics();
-    this.bossTimerBar.visible = false;
     this.container.addChild(this.bossTimerBar);
 
-    const timerStyle = new TextStyle({
-      fontSize: 12,
-      fill: 0xff6666,
-      fontWeight: 'bold',
+    this.bossTimerText = new Text({
+      text: '',
+      style: createTextStyle({ 
+        fontSize: 18, 
+        fill: 0xffffff, 
+        padding: 8 
+      }),
+      resolution: window.devicePixelRatio || 2,
     });
-    this.bossTimerText = new Text({ text: '', style: timerStyle });
     this.bossTimerText.anchor.set(0.5, 0.5);
-    this.bossTimerText.x = this.areaW / 2;
-    this.bossTimerText.y = hpBarY - 30 + 9;
-    this.bossTimerText.visible = false;
+    this.bossTimerText.x = Math.floor(width / 2);
+    this.bossTimerText.y = 0; // Value will be set in updateBossTimer
     this.container.addChild(this.bossTimerText);
 
-    // Make clickable
-    this.background.eventMode = 'static';
-    this.background.cursor = 'pointer';
-    this.enemyBody.eventMode = 'static';
-    this.enemyBody.cursor = 'pointer';
-
-    // Subscribe to events
-    EventBus.on(Events.ENEMY_SPAWNED, (enemy: unknown) => {
-      this.onEnemySpawned(enemy as EnemyState);
-    });
-    EventBus.on(Events.BOSS_SPAWNED, (enemy: unknown) => {
-      this.onEnemySpawned(enemy as EnemyState);
-    });
-    EventBus.on(Events.ENEMY_DAMAGED, (dmg: unknown, currentHP: unknown, maxHP: unknown) => {
-      this.onDamaged(dmg as Decimal, currentHP as Decimal, maxHP as Decimal);
-    });
-    EventBus.on(Events.BOSS_TIMER_EXPIRED, () => {
-      this.isBoss = false;
-      this.bossTimerBg.visible = false;
-      this.bossTimerBar.visible = false;
-      this.bossTimerText.visible = false;
-    });
+    this.setupEventListeners();
   }
 
-  private onEnemySpawned(enemy: EnemyState): void {
-    this.isBoss = enemy.isBoss;
-    this.currentColorIndex = (this.currentColorIndex + 1) % ENEMY_COLORS_NORMAL.length;
-    this.updateHPBar(enemy.currentHP, enemy.maxHP);
-    this.enemyNameText.text = enemy.isBoss ? `👑 ${enemy.name} 👑` : enemy.name;
-    this.enemyNameText.style.fill = enemy.isBoss ? 0xffd700 : 0xffffff;
-    this.drawEnemyBody(enemy.isBoss);
-
-    this.bossTimerBg.visible = enemy.isBoss;
-    this.bossTimerBar.visible = enemy.isBoss;
-    this.bossTimerText.visible = enemy.isBoss;
+  private setupEventListeners(): void {
+    EventBus.on(Events.ENEMY_SPAWNED, (enemy) => this.onEnemyUpdate(enemy));
+    EventBus.on(Events.BOSS_SPAWNED, (enemy) => this.onEnemyUpdate(enemy));
+    EventBus.on(Events.ENEMY_DAMAGED, (_dmg, hp, max) => this.updateHP(hp as Decimal, max as Decimal));
   }
 
-  private onDamaged(dmg: Decimal, currentHP: Decimal, maxHP: Decimal): void {
-    this.updateHPBar(currentHP, maxHP);
-    this.triggerShake(3, 0.15);
+  private onEnemyUpdate(enemy: any): void {
+    this.enemyNameText.text = enemy.name;
+    this.enemyNameText.style.fill = enemy.isBoss ? 0xffcc00 : 0xffffff;
+    this.updateHP(enemy.currentHP, enemy.maxHP);
+    this.updateVisuals(enemy.name, enemy.isBoss);
+    this.updateMobProgress(enemy.killCount + 1, 10, enemy.isBoss);
+    
+    // Auto-hide boss timer for normal mobs
+    if (!enemy.isBoss) {
+        this.hideBossTimer();
+    }
   }
 
-  private drawEnemyBody(isBoss: boolean): void {
+  private updateVisuals(name: string, isBoss: boolean): void {
     this.enemyBody.clear();
-    const colors = isBoss ? ENEMY_COLORS_BOSS : ENEMY_COLORS_NORMAL;
-    const color = colors[this.currentColorIndex % colors.length];
+    this.enemyEyes.clear();
+    this.enemyIconContainer.removeChildren();
+    this.enemyIconContainer.addChild(this.enemyBody);
+    this.enemyIconContainer.addChild(this.enemyEyes);
+    
+    const zone = GameState.zone;
+    const isMilestoneBoss = isBoss && (zone === 1 || zone % 10 === 0);
+    const isIntermediateBoss = isBoss && !isMilestoneBoss;
 
-    const cx = this.areaW / 2;
-    const cy = this.areaH / 2 - 20;
-
-    if (isBoss) {
-      // Boss: larger diamond shape
-      const size = 150;
-      this.enemyBody.moveTo(cx, cy - size);
-      this.enemyBody.lineTo(cx + size * 0.7, cy);
-      this.enemyBody.lineTo(cx, cy + size);
-      this.enemyBody.lineTo(cx - size * 0.7, cy);
-      this.enemyBody.closePath();
-      this.enemyBody.fill(color);
-      this.enemyBody.stroke({ color: 0xffd700, width: 4 });
-
-      // Inner decoration
-      const innerSize = 75;
-      this.enemyBody.moveTo(cx, cy - innerSize);
-      this.enemyBody.lineTo(cx + innerSize * 0.7, cy);
-      this.enemyBody.lineTo(cx, cy + innerSize);
-      this.enemyBody.lineTo(cx - innerSize * 0.7, cy);
-      this.enemyBody.closePath();
-      this.enemyBody.fill({ color: 0xffd700, alpha: 0.3 });
+    if (isMilestoneBoss) {
+        // MILESTONE BOSS: Show Hero PNG
+        const heroIdx = zone === 1 ? 1 : (zone / 10) + 1;
+        const hero = HERO_DATA[heroIdx];
+        if (hero && hero.image) {
+            const sprite = Sprite.from(hero.image);
+            sprite.anchor.set(0.5);
+            sprite.width = 380; // INCREASED: Enlarged for Milestone impact
+            sprite.height = 380;
+            this.enemyIconContainer.addChild(sprite);
+            this.currentSprite = sprite;
+            
+            // REMOVED: Aura per user request
+        } else {
+            this.generateProcedural(name, true, true);
+        }
     } else {
-      // Normal enemy: rounded rectangle — bigger for the large right panel
-      const w = 120 + Math.random() * 30;
-      const h = 120 + Math.random() * 30;
-      this.enemyBody.roundRect(cx - w / 2, cy - h / 2, w, h, 16);
-      this.enemyBody.fill(color);
-      this.enemyBody.stroke({ color: 0xffffff, alpha: 0.4, width: 2 });
-
-      // Eyes
-      this.enemyBody.circle(cx - 22, cy - 15, 12);
-      this.enemyBody.fill(0xffffff);
-      this.enemyBody.circle(cx + 22, cy - 15, 12);
-      this.enemyBody.fill(0xffffff);
-      this.enemyBody.circle(cx - 21, cy - 13, 6);
-      this.enemyBody.fill(0x000000);
-      this.enemyBody.circle(cx + 23, cy - 13, 6);
-      this.enemyBody.fill(0x000000);
+        // NORMAL MOB or INTERMEDIATE BOSS
+        this.generateProcedural(name, isBoss, isIntermediateBoss);
     }
-
-    this.enemyBody.eventMode = 'static';
-    this.enemyBody.cursor = 'pointer';
   }
 
-  private updateHPBar(currentHP: Decimal, maxHP: Decimal): void {
-    const hpBarX = 20;
-    const hpBarY = this.areaH - 60;
-    const hpBarW = this.areaW - 40;
-    const hpBarH = 22;
+  private generateProcedural(name: string, isBoss: boolean, isSpecial: boolean): void {
+    const color = this.getColorForName(name);
+    let size = 120 + Math.random() * 60; // INCREASED: Enlarged from 60-100
+    if (isSpecial) size *= 2.5; // INCREASED: Special bosses are HUGE (mult 2.5x)
 
-    const ratio = Math.max(0, Math.min(1, currentHP.div(maxHP).toNumber()));
-    const fillColor = this.isBoss
-      ? 0xc0392b
-      : ratio > 0.5 ? 0x27ae60 : ratio > 0.25 ? 0xf39c12 : 0xe74c3c;
+    const shapeType = Math.floor(Math.random() * 3);
 
-    this.hpBarFill.clear();
+    // DEMONIC AURA (Behind body)
+    if (isSpecial) {
+        this.enemyBody.beginFill(0xff0000, 0.2);
+        this.enemyBody.drawCircle(0, 0, size * 1.3);
+        this.enemyBody.endFill();
+    }
+
+    // Body
+    this.enemyBody.beginFill(isSpecial ? 0x000000 : color); // DEEP BLACK BODY
+    if (isSpecial) {
+        this.enemyBody.stroke({ color: 0xff0000, width: 8, alpha: 0.8 }); // THICK RED STROKE
+    } else {
+        this.enemyBody.stroke({ color: 0x000000, width: 4, alpha: 0.3 });
+    }
+
+    if (shapeType === 0) this.enemyBody.drawCircle(0, 0, size);
+    else if (shapeType === 1) this.enemyBody.drawRoundedRect(-size, -size, size * 2, size * 2, 20);
+    else {
+        this.enemyBody.drawPolygon([
+            0, -size, 
+            size, -size/2, 
+            size, size/2, 
+            0, size, 
+            -size, size/2, 
+            -size, -size/2
+        ]);
+    }
+    this.enemyBody.endFill();
+
+    // PROCEDURAL SPIKES (Intermediate Bosses)
+    if (isSpecial) {
+        this.enemyBody.beginFill(0x000000);
+        this.enemyBody.stroke({ color: 0xff0000, width: 4 });
+        const spikeCount = 8 + Math.floor(Math.random() * 6);
+        for (let i = 0; i < spikeCount; i++) {
+            const angle = (i / spikeCount) * Math.PI * 2 + (Math.random() * 0.5);
+            const tipX = Math.cos(angle) * (size * 1.5);
+            const tipY = Math.sin(angle) * (size * 1.5);
+            const baseAngle1 = angle - 0.2;
+            const baseAngle2 = angle + 0.2;
+            const b1X = Math.cos(baseAngle1) * (size * 0.9);
+            const b1Y = Math.sin(baseAngle1) * (size * 0.9);
+            const b2X = Math.cos(baseAngle2) * (size * 0.9);
+            const b2Y = Math.sin(baseAngle2) * (size * 0.9);
+            this.enemyBody.drawPolygon([b1X, b1Y, tipX, tipY, b2X, b2Y]);
+        }
+        this.enemyBody.endFill();
+    }
+
+    // Eyes
+    const eyeCount = isSpecial ? 12 + Math.floor(Math.random() * 8) : (Math.random() > 0.7 ? 1 : 2);
+    const eyeSize = size * (isSpecial ? 0.08 : 0.25);
+    
+    // RED EYES FOR SPECIALS, WHITE FOR NORMAL
+    this.enemyEyes.beginFill(isSpecial ? 0xff0000 : 0xffffff);
+    if (isSpecial) {
+        for (let i = 0; i < eyeCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * size * 0.75;
+            this.enemyEyes.drawCircle(Math.cos(angle) * dist, Math.sin(angle) * dist, eyeSize);
+        }
+    } else {
+        if (eyeCount === 1) {
+            this.enemyEyes.drawCircle(0, -size * 0.1, eyeSize);
+        } else {
+            this.enemyEyes.drawCircle(-size * 0.35, -size * 0.1, eyeSize);
+            this.enemyEyes.drawCircle(size * 0.35, -size * 0.1, eyeSize);
+        }
+    }
+    this.enemyEyes.endFill();
+
+    // Pupils
+    this.enemyEyes.beginFill(0x000000);
+    // Redraw pupils at same positions
+    // In a real app we'd store positions but this is procedural redraw
+    // (Simplification: just fill black circles in the middle of currentEyeGraphics if we were more complex)
+    // For now we re-randomize or we just skip pupils for special to look 'demonic'
+    if (!isSpecial) {
+        if (eyeCount === 1) {
+            this.enemyEyes.drawCircle(0, -size * 0.1, eyeSize * 0.5);
+        } else {
+            this.enemyEyes.drawCircle(-size * 0.35, -size * 0.1, eyeSize * 0.5);
+            this.enemyEyes.drawCircle(size * 0.35, -size * 0.1, eyeSize * 0.5);
+        }
+    }
+    this.enemyEyes.endFill();
+    
+    this.currentSprite = this.enemyIconContainer;
+  }
+
+  private getColorForName(name: string): number {
+    const n = name.toLowerCase();
+    if (n.includes('skibidi')) return 0xcccccc; 
+    if (n.includes('sigma')) return 0x888888; 
+    if (n.includes('ohio')) return 0xffaa00; 
+    if (n.includes('karen')) return 0xff66bb; 
+    if (n.includes('boomer')) return 0x55aa55; 
+    if (n.includes('grug')) return 0xaa7744; 
+    if (n.includes('slime')) return 0x44ff44; 
+    if (n.includes('reddit')) return 0xff4400; 
+    if (n.includes('sussy') || n.includes('impostor')) return 0xff0000; 
+    
+    const colors = [0x4a9eff, 0xff4a9e, 0x9eff4a, 0xffd700, 0x8a2be2];
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+
+  private updateHP(hp: Decimal, maxHp: Decimal): void {
+    this.hpText.text = formatNumber(hp);
+    const ratio = hp.div(maxHp).toNumber();
+    const barW = Math.floor(this.areaW * 0.6);
+    const barH = 33;
+    const barX = Math.floor((this.areaW - barW) / 2);
+    const barY = Math.floor(this.areaH - 85);
+
+    this.hpBar.clear();
     if (ratio > 0) {
-      this.hpBarFill.roundRect(hpBarX, hpBarY, hpBarW * ratio, hpBarH, 4);
-      this.hpBarFill.fill(fillColor);
+        const isBoss = GameState.currentEnemy.isBoss;
+        this.hpBar.roundRect(barX, barY, Math.max(1, barW * ratio), barH, 4);
+        this.hpBar.fill(isBoss ? 0xff4444 : 0x44ff44);
     }
-
-    this.hpText.text = formatHP(currentHP, maxHP);
   }
 
-  updateBossTimer(timeRemaining: number, maxTime: number): void {
-    if (!this.isBoss || !GameState.bossTimerActive) return;
+  public triggerHitShake(): void {
+    this.enemyIconContainer.scale.set(1.15); // INCREASED scale impact
+    const shake = 15; // INCREASED shake for large enemies
+    this.enemyIconContainer.x = Math.floor(this.areaW / 2) + (Math.random() - 0.5) * shake;
+    this.enemyIconContainer.y = Math.floor(this.areaH / 2 - 20) + (Math.random() - 0.5) * shake;
 
-    const hpBarX = 20;
-    const hpBarY = this.areaH - 60;
-    const hpBarW = this.areaW - 40;
+    setTimeout(() => {
+        this.enemyIconContainer.scale.set(1.0);
+        this.enemyIconContainer.x = Math.floor(this.areaW / 2);
+        this.enemyIconContainer.y = Math.floor(this.areaH / 2 - 20);
+    }, 50);
+  }
 
-    const ratio = Math.max(0, timeRemaining / maxTime);
-    const timerColor = ratio > 0.5 ? 0xf39c12 : ratio > 0.25 ? 0xe67e22 : 0xe74c3c;
+  updateMobProgress(current: number, target: number, isBoss: boolean): void {
+    if (isBoss) {
+      this.mobProgressText.text = 'BOSS';
+      this.mobProgressText.style.fill = 0xff6666;
+    } else {
+      this.mobProgressText.text = `Mob ${Math.min(current, target)}/${target}`;
+      this.mobProgressText.style.fill = 0x7ec8e3;
+    }
+  }
+
+  updateBossTimer(timeLeft: number, totalTime: number): void {
+    this.bossTimerText.text = `TIME: ${Math.ceil(timeLeft)}s`;
+    const barW = Math.floor(this.areaW * 0.6); // MATCH HP BAR WIDTH
+    const barH = 33;
+    const barX = Math.floor((this.areaW - barW) / 2);
+    const barY = Math.floor(this.areaH - 130); // Shifted further up to not overlap HP bar
+    const ratio = timeLeft / totalTime;
 
     this.bossTimerBar.clear();
     if (ratio > 0) {
-      this.bossTimerBar.roundRect(hpBarX, hpBarY - 30, hpBarW * ratio, 18, 4);
-      this.bossTimerBar.fill(timerColor);
+        this.bossTimerBar.roundRect(barX, barY, Math.max(4, barW * ratio), barH, 4);
+        this.bossTimerBar.fill(0xff6666);
     }
-
-    this.bossTimerText.text = `BOSS TIMER: ${Math.ceil(timeRemaining)}s`;
-  }
-
-  private triggerShake(intensity: number, duration: number): void {
-    this.shakeIntensity = intensity;
-    this.shakeTime = duration;
-  }
-
-  update(deltaSeconds: number): void {
-    if (this.shakeTime > 0) {
-      this.shakeTime -= deltaSeconds;
-      if (this.shakeTime <= 0) {
-        this.shakeTime = 0;
-        this.container.x = this.baseX;
-        this.container.y = this.baseY;
-      } else {
-        this.container.x = this.baseX + (Math.random() - 0.5) * this.shakeIntensity * 2;
-        this.container.y = this.baseY + (Math.random() - 0.5) * this.shakeIntensity * 2;
-      }
-    }
+    
+    this.bossTimerText.x = Math.floor(this.areaW / 2);
+    this.bossTimerText.y = Math.floor(barY + barH / 2);
+    this.bossTimerText.style.fill = 0xffffff; // WHITE TEXT FOR CONTRAST
+    this.bossTimerText.visible = true;
+    this.bossTimerBar.visible = true;
   }
 
   setBasePosition(x: number, y: number): void {
-    this.baseX = x;
-    this.baseY = y;
-    this.container.x = x;
-    this.container.y = y;
+    this.container.x = Math.floor(x);
+    this.container.y = Math.floor(y);
   }
 
-  onClickAt(x: number, y: number): void {
-    // Visual feedback only, actual damage handled by ClickManager
+  hideBossTimer(): void {
+    this.bossTimerText.visible = false;
+    this.bossTimerBar.visible = false;
   }
 
-  get width(): number {
-    return this.areaW;
-  }
-
-  get height(): number {
-    return this.areaH;
+  update(deltaSeconds: number): void {
+    this.floatTime += deltaSeconds * 3;
+    this.floatOffset = Math.sin(this.floatTime) * 8;
+    this.enemyIconContainer.y = Math.floor(this.areaH / 2 - 20) + this.floatOffset;
   }
 }

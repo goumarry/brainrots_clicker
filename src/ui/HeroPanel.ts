@@ -1,17 +1,10 @@
-import {
-  Container, Graphics, Text, TextStyle, Rectangle
-} from 'pixi.js';
-import { HERO_DATA } from '../config/HeroData';
-import { GameState } from '../core/GameState';
+import { Container, Graphics, Text, TextStyle, Sprite, Rectangle } from 'pixi.js';
+import { createTextStyle } from './styles/Typography';
 import { HeroManager } from '../core/HeroManager';
-import { GoldManager } from '../core/GoldManager';
+import { formatGold, formatDPS } from '../systems/NumberFormatter';
+import { GameState } from '../core/GameState';
 import { EventBus, Events } from '../systems/EventBus';
-import { formatNumber, formatGold, formatDPS } from '../systems/NumberFormatter';
-import { Decimal } from '../systems/BigNumber';
-
-const PANEL_PADDING = 8;
-const HERO_CARD_H = 72;
-const HERO_CARD_GAP = 6;
+import { HERO_DATA } from '../config/HeroData';
 
 interface HeroCard {
   container: Container;
@@ -19,254 +12,279 @@ interface HeroCard {
   nameText: Text;
   levelText: Text;
   dpsText: Text;
-  costText: Text;
-  buyBtn: Graphics;
-  buyBtnText: Text;
-  index: number;
+  costText: Text | null;
+  buyBtn: Graphics | null;
+  iconContainer: Container;
+  isNext?: boolean;
 }
 
 export class HeroPanel {
   container: Container;
-  private panelBg: Graphics;
-  private scrollContainer: Container;
-  private maskGraphic: Graphics;
   private panelW: number;
   private panelH: number;
+  private scrollContainer: Container;
   private cards: HeroCard[] = [];
   private scrollY: number = 0;
-  private totalContentH: number = 0;
-  private isDragging: boolean = false;
-  private dragStartY: number = 0;
-  private dragStartScrollY: number = 0;
+  private maxScroll: number = 0;
 
   constructor(width: number, height: number) {
     this.panelW = width;
     this.panelH = height;
     this.container = new Container();
+    this.container.eventMode = 'static';
+    this.container.hitArea = new Rectangle(0, 0, width, height);
 
-    // Panel background
-    this.panelBg = new Graphics();
-    this.panelBg.roundRect(0, 0, width, height, 8);
-    this.panelBg.fill(0x0d1b2a);
-    this.panelBg.stroke({ color: 0x1e3a5f, width: 2 });
-    this.container.addChild(this.panelBg);
-
-    // Header
-    const headerBg = new Graphics();
-    headerBg.roundRect(0, 0, width, 30, 8);
-    headerBg.fill(0x1e3a5f);
-    this.container.addChild(headerBg);
-
-    const headerText = new Text({
-      text: '⚔️ HEROES',
-      style: new TextStyle({ fontSize: 14, fontWeight: 'bold', fill: 0x7ec8e3 }),
-    });
-    headerText.x = PANEL_PADDING;
-    headerText.y = 7;
-    this.container.addChild(headerText);
-
-    // Scroll container
     this.scrollContainer = new Container();
-    this.scrollContainer.y = 32;
     this.container.addChild(this.scrollContainer);
 
-    // Mask for scroll
-    this.maskGraphic = new Graphics();
-    this.maskGraphic.rect(0, 32, width, height - 32);
-    this.maskGraphic.fill(0xffffff);
-    this.container.addChild(this.maskGraphic);
-    this.scrollContainer.mask = this.maskGraphic;
+    // MASK TO PREVENT ELEMENTS FROM OVERFLOWING
+    const mask = new Graphics();
+    mask.rect(0, 0, width, height);
+    mask.fill(0xffffff); // Color doesn't matter for mask
+    this.container.addChild(mask);
+    this.scrollContainer.mask = mask;
 
-    // Create hero cards
-    this.buildCards();
+    this.build();
+    this.setupInteractivity();
 
-    // Scroll interaction
-    this.container.eventMode = 'static';
-    this.container.on('pointerdown', (e) => {
-      this.isDragging = true;
-      this.dragStartY = e.global.y;
-      this.dragStartScrollY = this.scrollY;
-    });
-    this.container.on('pointermove', (e) => {
-      if (!this.isDragging) return;
-      const delta = e.global.y - this.dragStartY;
-      this.setScrollY(this.dragStartScrollY + delta);
-    });
-    this.container.on('pointerup', () => { this.isDragging = false; });
-    this.container.on('pointerupoutside', () => { this.isDragging = false; });
-
-    // Wheel scroll
-    this.container.on('wheel', (e: WheelEvent) => {
-      this.setScrollY(this.scrollY - (e as any).deltaY * 0.5);
-    });
-
-    // Events
-    EventBus.on(Events.GOLD_CHANGED, () => this.updateAllCards());
-    EventBus.on(Events.HERO_BOUGHT, () => this.updateAllCards());
-    EventBus.on(Events.DPS_CHANGED, () => this.updateAllCards());
-    EventBus.on(Events.SAVE_LOADED, () => this.updateAllCards());
+    EventBus.on(Events.GOLD_CHANGED, () => this.updateButtons());
+    EventBus.on(Events.HERO_BOUGHT, () => this.refresh());
+    EventBus.on(Events.ASCENSION_COMPLETE, () => this.refresh());
+    EventBus.on(Events.BOSS_SPAWNED, () => this.refresh()); // In case a boss kill just happened but event is different
+    EventBus.on(Events.ENEMY_DIED, (gold, isBoss) => { if(isBoss) this.refresh(); });
   }
 
-  private buildCards(): void {
-    const contentW = this.panelW - PANEL_PADDING * 2;
+  public refresh(): void {
+    this.build();
+  }
+
+  private build(): void {
+    const cardH = 110;
+    const padding = 10;
+    this.cards = [];
+    this.scrollContainer.removeChildren();
+
+    const lastUnlockedIdx = GameState.heroes.reduce((max, h, idx) => h.isUnlocked ? idx : max, 0);
+    const nextLockedIdx = lastUnlockedIdx + 1;
 
     for (let i = 0; i < HERO_DATA.length; i++) {
-      const hero = HERO_DATA[i];
-      const y = i * (HERO_CARD_H + HERO_CARD_GAP);
+        const hero = HERO_DATA[i];
+        const isUnlocked = GameState.heroes[i].isUnlocked;
+        const isNext = i === nextLockedIdx;
+        
+        const cardContainer = new Container();
+        cardContainer.x = padding;
+        cardContainer.y = padding + (this.cards.length) * (cardH + padding);
 
-      const cardContainer = new Container();
-      cardContainer.x = PANEL_PADDING;
-      cardContainer.y = y + PANEL_PADDING;
-      this.scrollContainer.addChild(cardContainer);
+        const cardBg = new Graphics();
+        cardBg.roundRect(0, 0, this.panelW - padding * 2, cardH, 8);
+        if (isUnlocked) cardBg.fill(0x1a2d42);
+        else if (isNext) cardBg.fill(0x0a1b2a); // "Next Hero" highlight color
+        else cardBg.fill(0x02050a); // Deep black for others
+        
+        cardBg.stroke({ color: isUnlocked ? 0x2a3a50 : (isNext ? 0x2a3a50 : 0x0a101a), width: 1.5 });
+        cardContainer.addChild(cardBg);
+        
+        const cardW = this.panelW - padding * 2;
 
-      // Card background
-      const bg = new Graphics();
-      bg.roundRect(0, 0, contentW, HERO_CARD_H, 8);
-      bg.fill(0x0f2233);
-      bg.stroke({ color: hero.color, width: 1.5 });
-      cardContainer.addChild(bg);
+        // Icon
+        const iconContainer = new Container();
+        iconContainer.x = 10;
+        iconContainer.y = 12;
+        cardContainer.addChild(iconContainer);
 
-      // Hero color accent strip
-      const accent = new Graphics();
-      accent.roundRect(0, 0, 4, HERO_CARD_H, 4);
-      accent.fill(hero.color);
-      accent.eventMode = 'none';
-      cardContainer.addChild(accent);
+        if (hero.image) {
+            const sprite = Sprite.from(hero.image);
+            sprite.width = 90;
+            sprite.height = 90;
+            if (!isUnlocked) {
+                sprite.tint = isNext ? 0x222222 : 0x000000; // Next hero is visible silhouette
+            }
+            iconContainer.addChild(sprite);
+        } else {
+            if (isUnlocked) {
+                const emoji = new Text({
+                    text: hero.emoji,
+                    style: createTextStyle({ fontSize: 32, fontWeight: 'normal', padding: 8 }),
+                    resolution: window.devicePixelRatio || 2,
+                });
+                emoji.anchor.set(0.5);
+                emoji.x = 45;
+                emoji.y = 45;
+                iconContainer.addChild(emoji);
+            } else {
+                // Emoji placeholder silhouette correctly centered
+                const placeholder = new Graphics();
+                placeholder.circle(45, 45, 38);
+                placeholder.fill(0x000000);
+                iconContainer.addChild(placeholder);
+            }
+        }
 
-      // Emoji icon
-      const emojiText = new Text({
-        text: hero.emoji,
-        style: new TextStyle({ fontSize: 28 }),
-      });
-      emojiText.x = 12;
-      emojiText.y = HERO_CARD_H / 2 - 16;
-      emojiText.eventMode = 'none';
-      cardContainer.addChild(emojiText);
+        // REMOVED lockOverlay from iconContainer per user request
 
-      // Name
-      const nameText = new Text({
-        text: hero.name,
-        style: new TextStyle({ fontSize: 13, fontWeight: 'bold', fill: 0xffffff }),
-      });
-      nameText.x = 52;
-      nameText.y = 8;
-      nameText.eventMode = 'none';
-      cardContainer.addChild(nameText);
+        // Name
+        const nameText = new Text({
+            text: isUnlocked ? hero.name : `(Defeat Zone ${hero.unlockZone} Boss)`,
+            style: createTextStyle({ 
+                fontSize: isUnlocked ? 22 : 16, 
+                fill: isUnlocked ? 0xffffff : (isNext ? 0x7fbfff : 0x4a5a6a), 
+                padding: 8 
+            }),
+            resolution: window.devicePixelRatio || 2,
+        });
+        nameText.x = isUnlocked ? 110 : Math.floor(cardW / 2);
+        nameText.anchor.set(isUnlocked ? 0 : 0.5, 0.5);
+        nameText.y = isUnlocked ? 28 : cardH / 2;
+        cardContainer.addChild(nameText);
 
-      // Level text
-      const levelText = new Text({
-        text: 'Lv. 0',
-        style: new TextStyle({ fontSize: 11, fill: 0xaaaaaa }),
-      });
-      levelText.x = 52;
-      levelText.y = 26;
-      levelText.eventMode = 'none';
-      cardContainer.addChild(levelText);
+        // Stats (Only if unlocked)
+        let levelText: Text;
+        let dpsText: Text;
 
-      // DPS text
-      const dpsText = new Text({
-        text: 'DPS: 0/s',
-        style: new TextStyle({ fontSize: 11, fill: 0x88ccff }),
-      });
-      dpsText.x = 52;
-      dpsText.y = 42;
-      dpsText.eventMode = 'none';
-      cardContainer.addChild(dpsText);
+        if (isUnlocked) {
+            const state = GameState.heroes[i];
+            levelText = new Text({
+                text: `Level ${state.level}`,
+                style: createTextStyle({ fontSize: 16, fill: 0x8899aa, padding: 4 }),
+                resolution: window.devicePixelRatio || 2,
+            });
+            levelText.x = 110;
+            levelText.y = 48;
+            cardContainer.addChild(levelText);
 
-      // Buy button — use a Container so clicks on the label also register
-      const btnW = 90;
-      const btnH = 38;
-      const btnX = contentW - btnW - 8;
-      const btnY = (HERO_CARD_H - btnH) / 2;
+            dpsText = new Text({
+                text: i === 0 
+                    ? `Click Bonus: +${state.level}` 
+                    : `Damage: +${formatDPS(HeroManager.getHeroDPS(i))}/s`,
+                style: createTextStyle({ fontSize: 16, fill: 0x4a9eff, padding: 4 }),
+                resolution: window.devicePixelRatio || 2,
+            });
+            dpsText.x = 110;
+            dpsText.y = 74;
+            cardContainer.addChild(dpsText);
+        } else {
+            // Placeholder text for locked stats
+            levelText = new Text({ text: '', style: createTextStyle({ fontSize: 0 }) });
+            dpsText = new Text({ text: '', style: createTextStyle({ fontSize: 0 }) });
+        }
 
-      const buyBtn = new Graphics();
-      buyBtn.roundRect(btnX, btnY, btnW, btnH, 6);
-      buyBtn.fill(0x27ae60);
-      buyBtn.eventMode = 'static';
-      buyBtn.cursor = 'pointer';
-      cardContainer.addChild(buyBtn);
+        let buyBtn: Graphics | null = null;
+        let costText: Text | null = null;
 
-      const costText = new Text({
-        text: `💰${formatGold(hero.baseCost)}`,
-        style: new TextStyle({ fontSize: 11, fontWeight: 'bold', fill: 0xffffff }),
-      });
-      costText.anchor.set(0.5, 0.5);
-      costText.x = btnX + btnW / 2;
-      costText.y = btnY + btnH / 2;
-      costText.eventMode = 'none';
-      cardContainer.addChild(costText);
+        if (isUnlocked) {
+            const btnW = 140;
+            const btnH = 54;
+            buyBtn = new Graphics();
+            buyBtn.roundRect(this.panelW - padding * 2 - btnW - 10, cardH / 2 - btnH / 2, btnW, btnH, 10);
+            buyBtn.fill(0x2d5a27);
+            buyBtn.eventMode = 'static';
+            buyBtn.cursor = 'pointer';
+            
+            const idx = i;
+            buyBtn.on('pointerdown', () => {
+                if (HeroManager.buyHero(idx)) {
+                    this.refresh();
+                }
+            });
+            cardContainer.addChild(buyBtn);
 
-      // Click buy button
-      buyBtn.on('pointerdown', (e) => {
-        e.stopPropagation();
-        HeroManager.buyHero(i);
-      });
+            const cost = HeroManager.getHeroCost(i);
+            costText = new Text({
+                text: `${formatGold(cost)}💰`,
+                style: createTextStyle({ fontSize: 18, fill: 0xffffff, padding: 4 }),
+                resolution: window.devicePixelRatio || 2,
+            });
+            costText.anchor.set(0.5);
+            costText.x = this.panelW - padding * 2 - btnW / 2 - 10;
+            costText.y = cardH / 2;
+            cardContainer.addChild(costText);
+        } else {
+            // Show LOCKED badge
+            const lockBadge = new Graphics();
+            lockBadge.roundRect(this.panelW - padding * 2 - 140, (cardH - 50) / 2, 130, 50, 10);
+            lockBadge.fill(0x1a1a1a);
+            lockBadge.stroke({ color: 0x3a2a1a, width: 2.5 });
+            cardContainer.addChild(lockBadge);
 
-      const card: HeroCard = {
-        container: cardContainer,
-        bg,
-        nameText,
-        levelText,
-        dpsText,
-        costText,
-        buyBtn,
-        buyBtnText: costText,
-        index: i,
-      };
+            const lockBadgeText = new Text({
+                text: '🔒 LOCKED',
+                style: createTextStyle({ fontSize: 16, fill: 0xaaaaaa, padding: 4 }),
+                resolution: window.devicePixelRatio || 2,
+            });
+            lockBadgeText.anchor.set(0.5);
+            lockBadgeText.x = this.panelW - padding * 2 - 75;
+            lockBadgeText.y = cardH / 2;
+            cardContainer.addChild(lockBadgeText);
+        }
 
-      this.cards.push(card);
+        this.scrollContainer.addChild(cardContainer);
+        this.cards.push({
+            container: cardContainer,
+            bg: cardBg,
+            nameText,
+            levelText,
+            dpsText,
+            costText,
+            buyBtn,
+            iconContainer
+        });
     }
 
-    this.totalContentH = HERO_DATA.length * (HERO_CARD_H + HERO_CARD_GAP) + PANEL_PADDING * 2;
-    this.updateAllCards();
+    this.maxScroll = Math.max(0, padding + this.cards.length * (cardH + padding) - this.panelH);
+    this.clampScroll();
   }
 
-  private updateAllCards(): void {
+  private updateButtons(): void {
     for (let i = 0; i < this.cards.length; i++) {
-      this.updateCard(i);
+        const card = this.cards[i];
+        if (!card.buyBtn) continue;
+
+        const cost = HeroManager.getHeroCost(i);
+        const canAfford = GameState.gold.gte(cost);
+        card.buyBtn.fill(canAfford ? 0x2d5a27 : 0x334455);
+        if (card.costText) card.costText.text = `${formatGold(cost)}💰`;
     }
   }
 
-  private updateCard(i: number): void {
-    const card = this.cards[i];
-    const heroState = GameState.heroes[i];
-    const heroDef = HERO_DATA[i];
+  private setupInteractivity(): void {
+    this.container.eventMode = 'static';
+    this.container.on('wheel', (e) => {
+        this.scrollY -= e.deltaY;
+        this.clampScroll();
+    });
 
-    const level = heroState.level;
-    const cost = HeroManager.getHeroCost(i);
-    const dps = HeroManager.getHeroDPS(i);
-    const canAfford = GoldManager.canAfford(cost);
-
-    card.levelText.text = `Lv. ${level}`;
-    card.dpsText.text = `DPS: ${formatDPS(dps)}/s`;
-    card.costText.text = `💰 ${formatGold(cost)}`;
-
-    // Button color based on affordability
-    card.buyBtn.clear();
-    const btnW = 90;
-    const btnH = 38;
-    const btnX = (this.panelW - PANEL_PADDING * 2) - btnW - 8;
-    const btnY = (HERO_CARD_H - btnH) / 2;
-
-    const btnColor = canAfford ? 0x27ae60 : 0x555555;
-    card.buyBtn.roundRect(btnX, btnY, btnW, btnH, 6);
-    card.buyBtn.fill(btnColor);
-    card.buyBtn.stroke({ color: canAfford ? 0x2ecc71 : 0x333333, width: 1 });
-
-    card.costText.style.fill = canAfford ? 0xffffff : 0x888888;
-
-    // Milestone indicator
-    if (level > 0 && level % 25 === 0) {
-      card.bg.clear();
-      card.bg.roundRect(0, 0, this.panelW - PANEL_PADDING * 2, HERO_CARD_H, 8);
-      card.bg.fill(0x1a2e1a);
-      card.bg.stroke({ color: 0x2ecc71, width: 2 });
-    }
+    let dragging = false;
+    let lastY = 0;
+    
+    this.container.on('pointerdown', (e) => { 
+        dragging = true; 
+        lastY = e.global.y; 
+        
+        // Ensure no other component handles this event purely if we are scrolling
+        // e.stopPropagation(); 
+    });
+    
+    window.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const dy = e.clientY - lastY;
+        this.scrollY += dy * 1.5;
+        lastY = e.clientY;
+        this.clampScroll();
+    });
+    
+    window.addEventListener('pointerup', () => { 
+        dragging = false; 
+    });
   }
 
-  private setScrollY(y: number): void {
-    const maxScroll = Math.max(0, this.totalContentH - (this.panelH - 32));
-    this.scrollY = Math.max(-maxScroll, Math.min(0, y));
-    this.scrollContainer.y = 32 + this.scrollY;
+  private clampScroll(): void {
+    if (this.scrollY > 0) this.scrollY = 0;
+    if (this.scrollY < -this.maxScroll) this.scrollY = -this.maxScroll;
+    this.scrollContainer.y = Math.floor(this.scrollY);
+  }
+
+  updateAllCards(): void {
+    this.refresh();
   }
 }

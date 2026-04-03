@@ -30,11 +30,6 @@ export const SaveManager = {
       const raw = JSON.parse(json) as GameStateData;
 
       // Reconstruct Decimal values from strings
-      const defaultStats = {
-        totalKills: 0, bossKills: 0, totalCrits: 0, skillsUsed: 0,
-        skillsUsedById: [0, 0, 0, 0, 0, 0, 0], questsCompleted: 0,
-        totalAscensions: 0, totalSigmaSouls: 0, maxZoneReached: 0, herosBought: 0,
-      };
       const data: GameStateData = {
         gold: toBigNum(raw.gold?.toString() ?? '0'),
         goldMultiplier: toBigNum(raw.goldMultiplier?.toString() ?? '1'),
@@ -49,12 +44,11 @@ export const SaveManager = {
         skills: raw.skills ?? [],
         dpsMultiplier: raw.dpsMultiplier ?? '1',
         ascensionUpgrades: raw.ascensionUpgrades ?? [],
-        sigmaSOuls: raw.sigmaSOuls ?? 0,
+        sigmaSouls: raw.sigmaSouls ?? 0,
         relics: raw.relics ?? [],
         achievements: raw.achievements ?? [],
-        quests: raw.quests ?? [],
-        questLastReset: raw.questLastReset ?? 0,
-        stats: raw.stats ?? defaultStats,
+        stats: raw.stats,
+        highestZoneAscended: raw.highestZoneAscended ?? 0,
       };
 
       GameState.deserialize(data);

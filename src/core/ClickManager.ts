@@ -7,7 +7,7 @@ import { formatNumber } from '../systems/NumberFormatter';
 import { AscensionManager } from './AscensionManager';
 import { AchievementManager } from './AchievementManager';
 import { RelicManager } from './RelicManager';
-import { QuestManager } from './QuestManager';
+import { AudioManager } from '../systems/AudioManager';
 
 export const ClickManager = {
   handleClick(x: number, y: number): Decimal {
@@ -23,19 +23,16 @@ export const ClickManager = {
     const isCrit = Math.random() < effectiveCritChance;
     const damage = isCrit ? baseDamage.mul(effectiveCritMult) : baseDamage;
     GameState.totalClicks += 1;
+    AudioManager.playHitSound();
     if (isCrit) {
       GameState.stats.totalCrits += 1;
     }
     EnemyManager.dealDamage(damage);
-    // Quest progress
-    QuestManager.updateProgress('clicks_today', 1);
-    AchievementManager.checkAll();
+    
     if (isCrit) {
       EventBus.emit(Events.CLICK_CRITICAL, damage, x, y);
-      EventBus.emit(Events.FLOATING_TEXT, `CRIT! ${formatNumber(damage)}`, x, y - 10, 0xff4444);
     } else {
       EventBus.emit(Events.CLICK_DAMAGE, damage, x, y);
-      EventBus.emit(Events.FLOATING_TEXT, formatNumber(damage), x, y, 0xffff44);
     }
     return damage;
   },

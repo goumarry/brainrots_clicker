@@ -1,4 +1,5 @@
-import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Application, Container, Graphics, Sprite, Text, TextStyle } from 'pixi.js';
+import { createTextStyle } from './styles/Typography';
 import { StatsDisplay } from './StatsDisplay';
 import { EnemyDisplay } from './EnemyDisplay';
 import { HeroPanel } from './HeroPanel';
@@ -7,8 +8,8 @@ import { SkillBar } from './SkillBar';
 import { TabBar, TabName } from './TabBar';
 import { AscensionScreen } from './screens/AscensionScreen';
 import { RelicScreen } from './screens/RelicScreen';
-import { QuestScreen } from './screens/QuestScreen';
 import { AchievementScreen } from './screens/AchievementScreen';
+import { AchievementManager } from '../core/AchievementManager';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { ParticleSystem } from './ParticleSystem';
 import { TutorialOverlay } from './TutorialOverlay';
@@ -16,235 +17,271 @@ import { AdRewardsPanel } from './AdRewardsPanel';
 import { EventBus, Events } from '../systems/EventBus';
 import { ClickManager } from '../core/ClickManager';
 import { GameState } from '../core/GameState';
+import { AudioManager } from '../systems/AudioManager';
 import { BalanceConfig } from '../config/BalanceConfig';
-import { QuestManager } from '../core/QuestManager';
 import { ACHIEVEMENT_DATA } from '../config/AchievementData';
 import { RelicInstance } from '../core/GameState';
-import { Decimal } from '../systems/BigNumber';
-import { formatGold, formatDPS } from '../systems/NumberFormatter';
-import { OfflineManager } from '../core/OfflineManager';
+import { formatGold, formatDPS, formatNumber } from '../systems/NumberFormatter';
 import { AdManager } from '../integrations/AdManager';
-
-const GAME_W = 1280;
-const GAME_H = 720;
-const TOP_BAR_H = 56;
-const LEFT_W = 460;
-const LEFT_H = GAME_H - TOP_BAR_H;         // 664
-const RIGHT_X = LEFT_W;
-const RIGHT_W = GAME_W - LEFT_W;            // 820
-const LEFT_TAB_H = 48;
-const LEFT_MINI_STATS_H = 48;
-const LEFT_CONTENT_Y = TOP_BAR_H + LEFT_TAB_H + LEFT_MINI_STATS_H; // 152
-const LEFT_CONTENT_H = LEFT_H - LEFT_TAB_H - LEFT_MINI_STATS_H;    // 568
-const RIGHT_ENEMY_H = LEFT_H - 70;          // 594
-const RIGHT_SKILL_Y = TOP_BAR_H + RIGHT_ENEMY_H;                    // 650
-
-// Center of enemy display area (for particles)
-const ENEMY_CENTER_X = RIGHT_X + RIGHT_W / 2;
-const ENEMY_CENTER_Y = TOP_BAR_H + RIGHT_ENEMY_H / 2;
+import { Decimal } from '../systems/BigNumber';
+import { ActiveSkillsDisplay } from './ActiveSkillsDisplay';
+import { HERO_DATA } from '../config/HeroData';
+import { EnemyManager } from '../core/EnemyManager';
 
 export class GameUI {
   private app: Application;
   private root: Container;
 
-  private statsDisplay: StatsDisplay;
-  private enemyDisplay: EnemyDisplay;
-  private heroPanel: HeroPanel;
-  private floatingTextManager: FloatingTextManager;
-  private skillBar: SkillBar;
-  private tabBar: TabBar;
+  private statsDisplay!: StatsDisplay;
+  private enemyDisplay!: EnemyDisplay;
+  private heroPanel!: HeroPanel;
+  private floatingTextManager!: FloatingTextManager;
+  private skillBar!: SkillBar;
+  private tabBar!: TabBar;
+  private uiOverlay!: Container;
 
-  private ascensionScreen: AscensionScreen;
-  private relicScreen: RelicScreen;
-  private questScreen: QuestScreen;
-  private achievementScreen: AchievementScreen;
-  private settingsScreen: SettingsScreen;
+  private ascensionScreen!: AscensionScreen;
+  private relicScreen!: RelicScreen;
+  private achievementScreen!: AchievementScreen;
+  private settingsScreen!: SettingsScreen;
 
-  private particleSystem: ParticleSystem;
-  private adRewardsPanel: AdRewardsPanel;
+  private particleSystem!: ParticleSystem;
+  private adRewardsPanel!: AdRewardsPanel;
 
   private activeTab: TabName = 'heroes';
 
-  private zoneNotifText: Text | null = null;
-  private zoneNotifTimer: number = 0;
-  private bossWarnText: Text | null = null;
+  private relicStatusText!: Text;
+  private activeSkillsHUD!: ActiveSkillsDisplay;
+  private activeToasts: { text: Text, timer: number, pos: 'center' | 'top-left' | 'top-right' }[] = [];
+  private achTimer: number = 0.5;
 
-  private offlinePopup: Text | null = null;
-  private offlinePopupTimer: number = 0;
-
-  private toastText: Text | null = null;
-  private toastTimer: number = 0;
+  // Layout Properties (Liquid)
+  private screenW: number;
+  private screenH: number;
+  private enemyCenterX: number = 0;
+  private enemyCenterY: number = 0;
+  private leftW: number = 530; // Increased from 480
+  private rightW: number;
+  private topBarH: number = 90;
+  private adPanelW: number = 100;
+  private skillBarH: number = 120;
 
   constructor(app: Application, parent: Container) {
     this.app = app;
+    this.screenW = app.screen.width;
+    this.screenH = app.screen.height;
+    this.rightW = this.screenW - this.leftW;
+
     this.root = new Container();
     parent.addChild(this.root);
 
+    this.build();
+    this.setupEventListeners();
+
+    // Resize listener for true liquid layout
+    window.addEventListener('resize', () => this.onResize());
+  }
+
+  private onResize(): void {
+    this.screenW = this.app.screen.width;
+    this.screenH = this.app.screen.height;
+    this.rightW = this.screenW - this.leftW;
+    this.build();
+  }
+
+  private build(): void {
+    this.root.removeChildren(); // Clean up on resize/rebuild
+    
+    const sw = this.screenW;
+    const sh = this.screenH;
+    const lw = this.leftW;
+    const rw = this.rightW;
+    const th = this.topBarH;
+    const aw = this.adPanelW;
+    const shh = this.skillBarH;
+
     // 1. Full background
     const bg = new Graphics();
-    bg.rect(0, 0, GAME_W, GAME_H);
+    bg.rect(0, 0, sw, sh);
     bg.fill(0x060d16);
     this.root.addChild(bg);
 
-    // 2. Vertical divider between left and right panels
-    const divider = new Graphics();
-    divider.rect(LEFT_W, TOP_BAR_H, 1, LEFT_H);
-    divider.fill(0x1e3a5f);
-    this.root.addChild(divider);
-
-    // 3. Top bar (stats display)
-    this.statsDisplay = new StatsDisplay(GAME_W, TOP_BAR_H);
-    this.statsDisplay.container.y = 0;
-    this.root.addChild(this.statsDisplay.container);
-
-    // 4. Left panel background
+    // 2. Left panel background
     const leftBg = new Graphics();
-    leftBg.rect(0, TOP_BAR_H, LEFT_W, LEFT_H);
-    leftBg.fill(0x080f18);
+    leftBg.rect(0, 0, lw, sh);
+    leftBg.fill(0x0d1b2a); // Unified deeper background
     this.root.addChild(leftBg);
 
-    // 5. Tab bar
-    this.tabBar = new TabBar(LEFT_W, LEFT_TAB_H, (tab) => this.onTabChange(tab));
-    this.tabBar.container.x = 0;
-    this.tabBar.container.y = TOP_BAR_H;
+    // 3. Tab bar (top left)
+    this.tabBar = new TabBar(lw, 90, (tab) => this.onTabChange(tab));
     this.root.addChild(this.tabBar.container);
 
-    // 6. Mini stats panel
-    this.buildLeftMiniStats(0, TOP_BAR_H + LEFT_TAB_H, LEFT_W, LEFT_MINI_STATS_H);
+    // 4. Management screens area
+    const contentH = sh - 90;
+    const contentY = 90;
 
-    // 7. Hero panel
-    this.heroPanel = new HeroPanel(LEFT_W, LEFT_CONTENT_H);
-    this.heroPanel.container.x = 0;
-    this.heroPanel.container.y = LEFT_CONTENT_Y;
+    this.heroPanel = new HeroPanel(lw, contentH);
+    this.heroPanel.container.y = contentY;
     this.root.addChild(this.heroPanel.container);
 
-    // 8. Ascension screen
-    this.ascensionScreen = new AscensionScreen(LEFT_W, LEFT_CONTENT_H);
-    this.ascensionScreen.container.x = 0;
-    this.ascensionScreen.container.y = LEFT_CONTENT_Y;
+    this.ascensionScreen = new AscensionScreen(lw, contentH);
+    this.ascensionScreen.container.y = contentY;
     this.ascensionScreen.container.visible = false;
     this.root.addChild(this.ascensionScreen.container);
 
-    // Relic screen
-    this.relicScreen = new RelicScreen(LEFT_W, LEFT_CONTENT_H);
-    this.relicScreen.container.x = 0;
-    this.relicScreen.container.y = LEFT_CONTENT_Y;
+    this.relicScreen = new RelicScreen(lw, contentH);
+    this.relicScreen.container.y = contentY;
     this.relicScreen.container.visible = false;
     this.root.addChild(this.relicScreen.container);
 
-    // Quest screen
-    this.questScreen = new QuestScreen(LEFT_W, LEFT_CONTENT_H);
-    this.questScreen.container.x = 0;
-    this.questScreen.container.y = LEFT_CONTENT_Y;
-    this.questScreen.container.visible = false;
-    this.root.addChild(this.questScreen.container);
-
-    // Achievement screen
-    this.achievementScreen = new AchievementScreen(LEFT_W, LEFT_CONTENT_H);
-    this.achievementScreen.container.x = 0;
-    this.achievementScreen.container.y = LEFT_CONTENT_Y;
+    this.achievementScreen = new AchievementScreen(lw, contentH);
+    this.achievementScreen.container.y = contentY;
     this.achievementScreen.container.visible = false;
     this.root.addChild(this.achievementScreen.container);
 
-    // Settings screen
-    this.settingsScreen = new SettingsScreen(LEFT_W, LEFT_CONTENT_H);
-    this.settingsScreen.container.x = 0;
-    this.settingsScreen.container.y = LEFT_CONTENT_Y;
+    this.settingsScreen = new SettingsScreen(lw, contentH);
+    this.settingsScreen.container.y = contentY;
     this.settingsScreen.container.visible = false;
     this.root.addChild(this.settingsScreen.container);
 
-    // 9. Right area background
-    const rightBg = new Graphics();
-    rightBg.rect(RIGHT_X, TOP_BAR_H, RIGHT_W, LEFT_H);
-    rightBg.fill(0x060d14);
-    this.root.addChild(rightBg);
+    // 5. Right Area
+    const rightX = lw;
 
-    // 10. Enemy display
-    const enemyDisplayW = RIGHT_W - 40;
-    const enemyDisplayH = RIGHT_ENEMY_H - 20;
-    this.enemyDisplay = new EnemyDisplay(enemyDisplayW, enemyDisplayH);
-    this.enemyDisplay.setBasePosition(RIGHT_X + 20, TOP_BAR_H + 10);
+    // Stats bar (Top Right)
+    this.uiOverlay = new Container();
+    this.uiOverlay.sortableChildren = true;
+    this.statsDisplay = new StatsDisplay(rw, this.uiOverlay, th);
+    this.statsDisplay.container.x = rightX;
+    this.root.addChild(this.statsDisplay.container);
+
+    // Header border
+    const headerBorder = new Graphics();
+    headerBorder.rect(rightX, 0, rw, th);
+    headerBorder.stroke({ color: 0x1e3a5f, width: 1.5 });
+    this.root.addChild(headerBorder);
+
+    // Layout spacing
+    const padding = 20;
+
+    // Ad Rewards Panel (Far Right, Inset)
+    const adPanelX = sw - aw - padding;
+    const adPanelY = th + padding;
+    const adPanelH = sh - th - shh - padding * 2;
+    this.adRewardsPanel = new AdRewardsPanel(aw, adPanelH);
+    this.adRewardsPanel.container.x = adPanelX;
+    this.adRewardsPanel.container.y = adPanelY;
+    this.root.addChild(this.adRewardsPanel.container);
+ 
+    // Combat Area (Center-Right, Inset)
+    const enemyAreaX = rightX + padding;
+    const enemyAreaW = adPanelX - enemyAreaX - padding;
+    const combatAreaH = sh - th - shh - padding * 2;
+    const enemyDisplayY = th + padding;
+ 
+    // Enemy Display
+    this.enemyDisplay = new EnemyDisplay(enemyAreaW, combatAreaH);
+    this.enemyDisplay.setBasePosition(enemyAreaX, enemyDisplayY);
     this.root.addChild(this.enemyDisplay.container);
-
-    // 11. Click zone — covers only the enemy area (not the ad panel strip at bottom)
-    const AD_PANEL_H = 56;
+ 
+    // Click zone (Matches Enemy Display exactly)
     const clickZone = new Graphics();
-    clickZone.rect(RIGHT_X, TOP_BAR_H, RIGHT_W, RIGHT_ENEMY_H - AD_PANEL_H);
+    clickZone.rect(enemyAreaX, enemyDisplayY, enemyAreaW, combatAreaH);
     clickZone.fill({ color: 0xffffff, alpha: 0 });
     clickZone.eventMode = 'static';
     clickZone.cursor = 'pointer';
+    this.enemyCenterX = enemyAreaX + enemyAreaW / 2;
+    this.enemyCenterY = enemyDisplayY + combatAreaH / 2;
+ 
     clickZone.on('pointerdown', (e) => {
-      ClickManager.handleClick(e.global.x, e.global.y);
+      const local = e.getLocalPosition(this.root);
+      ClickManager.handleClick(local.x, local.y);
     });
     this.root.addChild(clickZone);
-
-    // 12. Ad Rewards Panel — added AFTER clickZone so it's on top in hit-testing
-    this.adRewardsPanel = new AdRewardsPanel(RIGHT_W);
-    this.adRewardsPanel.container.x = RIGHT_X;
-    this.adRewardsPanel.container.y = TOP_BAR_H + RIGHT_ENEMY_H - AD_PANEL_H;
-    this.root.addChild(this.adRewardsPanel.container);
-
-    // 13. Skill bar
+ 
+    // Active Skills HUD (Left side of combat area)
+    this.activeSkillsHUD = new ActiveSkillsDisplay();
+    this.activeSkillsHUD.container.x = enemyAreaX + 15;
+    this.activeSkillsHUD.container.y = enemyDisplayY + 70; // Below persistent labels
+    this.root.addChild(this.activeSkillsHUD.container);
+ 
+    // Skill Bar (Bottom Right)
+    const skillBarY = sh - shh;
     const skillBarBg = new Graphics();
-    skillBarBg.rect(RIGHT_X, RIGHT_SKILL_Y, RIGHT_W, 70);
+    skillBarBg.rect(rightX, skillBarY, rw, shh);
     skillBarBg.fill(0x0d1825);
     this.root.addChild(skillBarBg);
 
-    this.skillBar = new SkillBar(RIGHT_W);
-    this.skillBar.container.x = RIGHT_X;
-    this.skillBar.container.y = RIGHT_SKILL_Y;
+    this.skillBar = new SkillBar(rw, this.uiOverlay);
+    this.skillBar.container.x = rightX;
+    this.skillBar.container.y = skillBarY;
     this.root.addChild(this.skillBar.container);
+ 
+    // CRITICAL: uiOverlay was never added to the stage!
+    this.root.addChild(this.uiOverlay);
 
-    // 14. Floating text container (renders on top of most things)
+    const skillBorder = new Graphics();
+    skillBorder.rect(rightX, skillBarY, rw, shh);
+    skillBorder.stroke({ color: 0x1e3a5f, width: 1.5 });
+    this.root.addChild(skillBorder);
+
+    // FX layers
     const floatingContainer = new Container();
     this.root.addChild(floatingContainer);
     this.floatingTextManager = new FloatingTextManager(floatingContainer);
 
-    // 15. Particle system container (top of stack for particles)
     const particleContainer = new Container();
     particleContainer.eventMode = 'none';
     this.root.addChild(particleContainer);
     this.particleSystem = new ParticleSystem(particleContainer);
+ 
+    // Relic status text (Top Left of combat area, matching Mob Progress elevation)
+    this.relicStatusText = new Text({
+      text: '',
+      style: createTextStyle({ fontSize: 13, fill: 0xaaaaaa, fontWeight: 'bold' }),
+      resolution: window.devicePixelRatio || 2,
+    });
+    this.relicStatusText.x = enemyAreaX + 20; // Symmetric with adPanelX - 15/20
+    this.relicStatusText.y = th + padding + 20; // MATCHES EnemyDisplay's mobProgressText.y
+    this.root.addChild(this.relicStatusText);
 
-    // 16. Tutorial overlay (last — sits on top of everything)
+    this.root.addChild(this.uiOverlay);
+
+    // Tutorial
     if (TutorialOverlay.shouldShow()) {
-      const tutorial = new TutorialOverlay(GAME_W, GAME_H, () => {});
+      const tutorial = new TutorialOverlay(sw, sh, () => {});
       this.root.addChild(tutorial.container);
     }
 
-    // Initialize quests
-    QuestManager.initOrRefresh();
-
-    this.setupEventListeners();
+    // Space key listener
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          ClickManager.handleClick(this.enemyCenterX, this.enemyCenterY);
+        }
+    });
+ 
+    // Auto-click visuals listener
+    EventBus.on(Events.AUTO_CLICK, (damage) => {
+      // Simulate click at center with some jitter
+      const jitter = 80; // INCREASED jitter for 30Hz density
+      const jx = this.enemyCenterX + (Math.random() - 0.5) * jitter;
+      const jy = this.enemyCenterY + (Math.random() - 0.5) * jitter;
+      this.showClickEffect(jx, jy, false, damage as Decimal);
+    });
+ 
     this.statsDisplay.refresh();
   }
-
-  private buildLeftMiniStats(x: number, y: number, width: number, height: number): void {
-    const bg = new Graphics();
-    bg.rect(x, y, width, height);
-    bg.fill(0x0a141f);
-    // bottom border
-    bg.rect(x, y + height - 1, width, 1);
-    bg.fill(0x1e3a5f);
-    this.root.addChild(bg);
-
-    // DPS text (left half)
-    const dpsText = new Text({ text: 'DPS: 0/s', style: { fontSize: 13, fill: 0x88ccff } });
-    dpsText.x = x + 10;
-    dpsText.y = y + height / 2 - 7;
-    this.root.addChild(dpsText);
-
-    // Crit text (right half)
-    const critText = new Text({ text: 'Crit: 5%', style: { fontSize: 13, fill: 0xff9944 } });
-    critText.x = x + width / 2 + 10;
-    critText.y = y + height / 2 - 7;
-    this.root.addChild(critText);
-
-    // Update on DPS change
-    EventBus.on(Events.DPS_CHANGED, (dps: unknown) => {
-      dpsText.text = `⚔️ DPS: ${formatDPS(dps as Decimal)}/s`;
-      critText.text = `🎯 Crit: ${Math.round(GameState.critChance * 100)}%`;
-    });
+ 
+  private showClickEffect(x: number, y: number, isCrit: boolean, damage: Decimal): void {
+    AudioManager.playHitSound();
+    this.floatingTextManager.spawn(
+      isCrit ? `CRIT! ${formatNumber(damage)}` : formatNumber(damage),
+      x,
+      y,
+      isCrit ? 0xff4444 : 0x9b59b6
+    );
+    this.particleSystem.spawnClickSparks(x, y, isCrit);
+    this.enemyDisplay.triggerHitShake();
   }
 
   private onTabChange(tab: TabName): void {
@@ -252,275 +289,248 @@ export class GameUI {
     this.heroPanel.container.visible = tab === 'heroes';
     this.ascensionScreen.container.visible = tab === 'ascension';
     this.relicScreen.container.visible = tab === 'relics';
-    this.questScreen.container.visible = tab === 'quests';
     this.achievementScreen.container.visible = tab === 'achievements';
     this.settingsScreen.container.visible = tab === 'settings';
   }
 
   private setupEventListeners(): void {
-    EventBus.on(Events.FLOATING_TEXT, (msg: unknown, x: unknown, y: unknown, color: unknown) => {
-      this.floatingTextManager.spawn(
-        msg as string,
-        x as number,
-        y as number,
-        color as number
-      );
+    EventBus.on(Events.CLICK_DAMAGE, (damage, x, y) => {
+      this.showClickEffect(x as number, y as number, false, damage as Decimal);
+    });
+ 
+    EventBus.on(Events.CLICK_CRITICAL, (damage, x, y) => {
+      this.showClickEffect(x as number, y as number, true, damage as Decimal);
+    });
+ 
+    EventBus.on(Events.FLOATING_TEXT, (msg, x, y, color) => {
+      // Generic floating text (still needed for gold etc.)
+      this.floatingTextManager.spawn(msg as string, x as number, y as number, color as number);
     });
 
-    EventBus.on(Events.ZONE_CHANGED, (zone: unknown) => {
-      this.showZoneNotification(zone as number);
-      // Zone celebration particles
-      this.particleSystem.spawnZoneCelebration(ENEMY_CENTER_X, ENEMY_CENTER_Y);
+    EventBus.on(Events.ZONE_CHANGED, (zone) => {
+      this.showToast(`✨ Zone ${zone} ✨`, true, 2.5, 'top-right');
+      this.particleSystem.spawnZoneCelebration(this.leftW + (this.screenW - this.leftW) / 2, this.screenH / 2);
     });
 
-    EventBus.on(Events.BOSS_SPAWNED, () => {
-      this.showBossWarning();
+    EventBus.on(Events.ENEMY_DIED, (_g, isBoss) => {
+        const color = (isBoss as boolean) ? 0xff4444 : 0x44ff88;
+        this.particleSystem.spawnKillBurst(this.screenW/2 + 200, this.screenH/2, color, 15);
     });
 
-    EventBus.on(Events.BOSS_TIMER_EXPIRED, () => {
-      this.hideBossWarning();
-      this.showZoneRetreatedNotification();
+    EventBus.on(Events.ACHIEVEMENT_UNLOCKED, (id) => {
+      const ach = ACHIEVEMENT_DATA.find(a => a.id === id);
+      if (ach) this.showToast(`🏆 Achievement: ${ach.name}!`, true, 3, 'center');
     });
 
-    EventBus.on(Events.ENEMY_DIED, (_goldEarned: unknown, isBoss: unknown) => {
-      if (isBoss) {
-        this.hideBossWarning();
-      }
-      // Kill burst particles
-      const color = (isBoss as boolean) ? 0xff4444 : 0x44ff88;
-      const count = (isBoss as boolean) ? 20 : 12;
-      this.particleSystem.spawnKillBurst(ENEMY_CENTER_X, ENEMY_CENTER_Y, color, count);
-    });
-
-    EventBus.on(Events.CLICK_DAMAGE, (_dmg: unknown, x: unknown, y: unknown) => {
-      this.particleSystem.spawnClickSparks(x as number, y as number, false);
-    });
-
-    EventBus.on(Events.CLICK_CRITICAL, (_dmg: unknown, x: unknown, y: unknown) => {
-      this.particleSystem.spawnClickSparks(x as number, y as number, true);
-    });
-
-    EventBus.on(Events.OFFLINE_CALCULATED, (result: unknown) => {
-      const r = result as { secondsAway: number; goldEarned: Decimal };
-      this.showOfflinePopup(r);
-    });
-
-    EventBus.on(Events.ACHIEVEMENT_UNLOCKED, (id: unknown) => {
-      const achId = id as string;
-      const ach = ACHIEVEMENT_DATA.find(a => a.id === achId);
-      if (ach) {
-        this.showToast(`🏆 Achievement: ${ach.name}!`);
-      }
-    });
-
-    EventBus.on(Events.RELIC_DROPPED, (relic: unknown) => {
+    EventBus.on(Events.RELIC_DROPPED, (relic) => {
       const r = relic as RelicInstance;
-      this.showToast(`🏺 Relic dropped: ${r.emoji} ${r.name} [${r.rarity}]!`);
+      this.showToast(`🏺 Relic dropped: ${r.emoji} ${r.name}!`, true, 4, 'top-left');
+    });
+
+    EventBus.on(Events.RELIC_FUSED, (relic) => {
+      const r = relic as RelicInstance;
+      this.showToast(`✨ FUSION! ${r.name} upgraded to ${r.rarity}! ✨`, true, 4, 'top-left');
+    });
+ 
+    EventBus.on(Events.SKILL_ANIMATION_TRIGGERED, (data: any) => {
+        this.animateHeroSkill(data.heroIds, data.skillId, data.damage);
     });
   }
 
-  private showToast(message: string): void {
-    if (this.toastText) {
-      this.root.removeChild(this.toastText);
-      this.toastText.destroy();
-      this.toastText = null;
-    }
-
-    const text = new Text({
+  private showToast(message: string, isBig: boolean = false, duration: number = 2.5, pos: 'center' | 'top-left' | 'top-right' = 'center'): void {
+    // Calculate combat area dimensions for centering
+    const padding = 20;
+    const enemyAreaX = this.leftW + padding;
+    const adPanelX = this.app.screen.width - this.adPanelW - padding;
+    const enemyAreaW = adPanelX - enemyAreaX - padding;
+ 
+    const toast = new Text({
       text: message,
-      style: new TextStyle({
-        fontSize: 13,
-        fontWeight: 'bold',
-        fill: 0xffd700,
-        stroke: { color: 0x000000, width: 3 },
-        align: 'center',
-        wordWrap: true,
-        wordWrapWidth: RIGHT_W - 40,
-      }),
-    });
-    text.anchor.set(0.5, 0);
-    text.x = RIGHT_X + RIGHT_W / 2;
-    text.y = TOP_BAR_H + 8;
-    text.alpha = 1;
-
-    this.root.addChild(text);
-    this.toastText = text;
-    this.toastTimer = 3.0;
-  }
-
-  private showOfflinePopup(result: { secondsAway: number; goldEarned: Decimal }): void {
-    if (this.offlinePopup) {
-      this.root.removeChild(this.offlinePopup);
-      this.offlinePopup.destroy();
-    }
-
-    const timeStr = OfflineManager.formatTime(result.secondsAway);
-    const goldStr = formatGold(result.goldEarned);
-    const msg = `Welcome back! Away for ${timeStr}\n+${goldStr} gold earned!`;
-
-    const text = new Text({
-      text: msg,
-      style: new TextStyle({
-        fontSize: 16,
-        fontWeight: 'bold',
+      style: createTextStyle({
+        fontSize: isBig ? 18 : 14,
         fill: 0xffd700,
         stroke: { color: 0x000000, width: 4 },
-        align: 'center',
+        align: pos === 'center' ? 'center' : (pos === 'top-left' ? 'left' : 'right'),
+        padding: 4,
       }),
+      resolution: window.devicePixelRatio || 2,
     });
-    text.anchor.set(0.5, 0.5);
-    text.x = RIGHT_X + RIGHT_W / 2;
-    text.y = TOP_BAR_H + RIGHT_ENEMY_H / 2;
-    text.alpha = 1;
-
-    this.root.addChild(text);
-    this.offlinePopup = text;
-    this.offlinePopupTimer = 4.0;
-  }
-
-  private showZoneNotification(zone: number): void {
-    if (this.zoneNotifText) {
-      this.root.removeChild(this.zoneNotifText);
-      this.zoneNotifText.destroy();
+    
+    // Vertical offset (40px below their matching persistent labels + stacking)
+    const labelY = this.topBarH + padding;
+    let baseOffset = (pos === 'center') ? 15 : 20;
+    baseOffset += 40; // Base margin from labels
+    
+    // Check existing toasts in the same position to calculate stack offset
+    const existingInPos = this.activeToasts.filter(t => t.pos === pos);
+    const stackOffset = existingInPos.length * 25; // 25px per additional message
+    
+    if (pos === 'center') {
+      toast.anchor.set(0.5, 0);
+      toast.x = enemyAreaX + enemyAreaW / 2;
+      toast.y = labelY + baseOffset + stackOffset;
+    } else if (pos === 'top-left') {
+      toast.anchor.set(0, 0);
+      toast.x = enemyAreaX + 20;
+      toast.y = labelY + baseOffset + stackOffset;
+    } else {
+      toast.anchor.set(1, 0);
+      toast.x = adPanelX - 20;
+      toast.y = labelY + baseOffset + stackOffset;
     }
-
-    const isBoss = zone % 5 === 0;
-    const msg = isBoss
-      ? `⚔️ ZONE ${zone} - BOSS FIGHT! ⚔️`
-      : `✨ Zone ${zone} ✨`;
-
-    const text = new Text({
-      text: msg,
-      style: new TextStyle({
-        fontSize: isBoss ? 22 : 18,
-        fontWeight: 'bold',
-        fill: isBoss ? 0xff4444 : 0x44ff88,
-        stroke: { color: 0x000000, width: 4 },
-        align: 'center',
-      }),
-    });
-    text.anchor.set(0.5, 0.5);
-    text.x = RIGHT_X + RIGHT_W / 2;
-    text.y = TOP_BAR_H + RIGHT_ENEMY_H / 2;
-    text.alpha = 1;
-
-    this.root.addChild(text);
-    this.zoneNotifText = text;
-    this.zoneNotifTimer = 2.5;
-  }
-
-  private showBossWarning(): void {
-    if (this.bossWarnText) return;
-
-    const text = new Text({
-      text: '👑 BOSS BATTLE! 👑',
-      style: new TextStyle({
-        fontSize: 20,
-        fontWeight: 'bold',
-        fill: 0xffd700,
-        stroke: { color: 0x000000, width: 4 },
-      }),
-    });
-    text.anchor.set(0.5, 0);
-    text.x = RIGHT_X + RIGHT_W / 2;
-    text.y = TOP_BAR_H + 20;
-
-    this.root.addChild(text);
-    this.bossWarnText = text;
-  }
-
-  private hideBossWarning(): void {
-    if (this.bossWarnText) {
-      this.root.removeChild(this.bossWarnText);
-      this.bossWarnText.destroy();
-      this.bossWarnText = null;
-    }
-  }
-
-  private showZoneRetreatedNotification(): void {
-    if (this.zoneNotifText) {
-      this.root.removeChild(this.zoneNotifText);
-      this.zoneNotifText.destroy();
-    }
-
-    const text = new Text({
-      text: '💀 Boss escaped! Retreated...',
-      style: new TextStyle({
-        fontSize: 16,
-        fontWeight: 'bold',
-        fill: 0xff6666,
-        stroke: { color: 0x000000, width: 3 },
-      }),
-    });
-    text.anchor.set(0.5, 0.5);
-    text.x = RIGHT_X + RIGHT_W / 2;
-    text.y = TOP_BAR_H + RIGHT_ENEMY_H / 2;
-
-    this.root.addChild(text);
-    this.zoneNotifText = text;
-    this.zoneNotifTimer = 2.0;
+    
+    this.root.addChild(toast);
+    this.activeToasts.push({ text: toast, timer: duration, pos });
   }
 
   update(deltaSeconds: number): void {
+    this.statsDisplay.update(deltaSeconds);
     this.floatingTextManager.update(deltaSeconds);
     this.enemyDisplay.update(deltaSeconds);
 
     if (GameState.bossTimerActive) {
-      this.enemyDisplay.updateBossTimer(
-        GameState.bossTimeRemaining,
-        BalanceConfig.BOSS_TIMER_SECONDS
-      );
+      this.enemyDisplay.updateBossTimer(GameState.bossTimeRemaining, BalanceConfig.BOSS_TIMER_SECONDS);
     }
 
     this.skillBar.update(deltaSeconds);
+    this.particleSystem.update(deltaSeconds);
+    AdManager.tick();
+ 
+    // Update relic status
+    const isActive = GameState.zone >= GameState.stats.maxZoneEver;
+    if (isActive) {
+      this.relicStatusText.text = `Relic Drops: ACTIVE ✅`;
+      this.relicStatusText.style.fill = 0x44ff88;
+    } else {
+      this.relicStatusText.text = `Relic Drops: LOCKED 🔒 (Record: Zone ${GameState.stats.maxZoneEver})`;
+      this.relicStatusText.style.fill = 0xff6666;
+    }
 
     // Update active screen
     if (this.activeTab === 'ascension') this.ascensionScreen.update(deltaSeconds);
     else if (this.activeTab === 'relics') this.relicScreen.update(deltaSeconds);
-    else if (this.activeTab === 'quests') this.questScreen.update(deltaSeconds);
     else if (this.activeTab === 'achievements') this.achievementScreen.update(deltaSeconds);
     else if (this.activeTab === 'settings') this.settingsScreen.update(deltaSeconds);
 
-    // Particle system update
-    this.particleSystem.update(deltaSeconds);
-
-    // Ad manager tick (check double gold expiry)
-    AdManager.tick();
-
-    // Zone notification fade
-    if (this.zoneNotifText && this.zoneNotifTimer > 0) {
-      this.zoneNotifTimer -= deltaSeconds;
-      if (this.zoneNotifTimer <= 0) {
-        this.root.removeChild(this.zoneNotifText);
-        this.zoneNotifText.destroy();
-        this.zoneNotifText = null;
-      } else if (this.zoneNotifTimer < 0.5) {
-        this.zoneNotifText.alpha = this.zoneNotifTimer / 0.5;
+    // Update active toasts
+    const toastsByPos: Record<string, typeof this.activeToasts> = { 'center': [], 'top-left': [], 'top-right': [] };
+    
+    // 1. Decrement timers and remove expired
+    for (let i = this.activeToasts.length - 1; i >= 0; i--) {
+      const toast = this.activeToasts[i];
+      toast.timer -= deltaSeconds;
+      if (toast.timer <= 0) {
+        this.root.removeChild(toast.text);
+        toast.text.destroy();
+        this.activeToasts.splice(i, 1);
+      } else {
+        if (toast.timer < 0.5) toast.text.alpha = toast.timer / 0.5;
+        // Group remaining for repositioning
+        toastsByPos[toast.pos].push(toast);
+      }
+    }
+    
+    // 2. Smoothly reposition remaining toasts (Slide Up effect)
+    const padding = 20;
+    const labelY = this.topBarH + padding;
+    
+    for (const pos in toastsByPos) {
+      const list = toastsByPos[pos];
+      // Note: list was built in reverse order (newest first). 
+      // We want oldest (created first) at the top. 
+      // Reverse again to get oldest-first order for indexing.
+      list.reverse(); 
+      
+      const baseOffset = (pos === 'center') ? 15 + 40 : 20 + 40;
+      
+      for (let j = 0; j < list.length; j++) {
+        const t = list[j];
+        const targetY = labelY + baseOffset + (j * 25);
+        // Lerp Y for smooth sliding
+        t.text.y += (targetY - t.text.y) * 0.15;
       }
     }
 
-    // Offline popup fade
-    if (this.offlinePopup && this.offlinePopupTimer > 0) {
-      this.offlinePopupTimer -= deltaSeconds;
-      if (this.offlinePopupTimer <= 0) {
-        this.root.removeChild(this.offlinePopup);
-        this.offlinePopup.destroy();
-        this.offlinePopup = null;
-      } else if (this.offlinePopupTimer < 1.0) {
-        this.offlinePopup.alpha = this.offlinePopupTimer / 1.0;
-      }
+    this.achTimer -= deltaSeconds;
+    if (this.achTimer <= 0) {
+      this.achTimer = 0.5;
+      AchievementManager.checkAll();
     }
-
-    // Toast fade
-    if (this.toastText && this.toastTimer > 0) {
-      this.toastTimer -= deltaSeconds;
-      if (this.toastTimer <= 0) {
-        this.root.removeChild(this.toastText);
-        this.toastText.destroy();
-        this.toastText = null;
-      } else if (this.toastTimer < 1.0) {
-        this.toastText.alpha = this.toastTimer / 1.0;
-      }
+    this.activeSkillsHUD.update(deltaSeconds);
+  }
+  private animateHeroSkill(heroIds: string[], _skillId: string, damage: any): void {
+    let hitTriggered = false;
+ 
+    heroIds.forEach((heroId, index) => {
+      const hero = HERO_DATA.find(h => h.id === heroId);
+      if (!hero || !hero.image) return;
+  
+      const sprite = Sprite.from(hero.image);
+      sprite.anchor.set(0.5);
+      sprite.scale.set(1.1);
+      sprite.x = -200; 
+      // Small vertical offset for subsequent heroes
+      sprite.y = this.enemyCenterY + (index * 40) - ((heroIds.length-1) * 20); 
+      sprite.zIndex = 5000;
+      
+      this.uiOverlay.addChild(sprite);
+  
+      let progress = 0;
+      const duration = 1.0; 
+      const startX = -150;
+      const endX = window.innerWidth + 150;
+      const delay = index * 0.15; // 150ms delay between heroes
+      let elapsed = 0;
+  
+      const ticker = (tickerObj: any) => {
+          const delta = tickerObj.deltaTime / 60;
+          elapsed += delta;
+ 
+          if (elapsed < delay) return;
+ 
+          progress += (delta) / duration;
+          sprite.x = startX + (endX - startX) * progress;
+          sprite.rotation = 0.1 * Math.sin(progress * 10);
+  
+          // Trigger impact when the FIRST hero reaches the center
+          if (index === 0 && !hitTriggered && sprite.x >= this.enemyCenterX) {
+              hitTriggered = true;
+              if (damage) {
+                this.handleSkillImpact(damage);
+              } else {
+                this.particleSystem.spawnClickSparks(this.enemyCenterX, this.enemyCenterY, false);
+              }
+          }
+  
+          if (progress >= 1) {
+              this.app.ticker.remove(ticker);
+              this.uiOverlay.removeChild(sprite);
+              sprite.destroy();
+          }
+      };
+      this.app.ticker.add(ticker);
+    });
+  }
+ 
+  private handleSkillImpact(damage: any): void {
+    // ACTUAL DAMAGE
+    EnemyManager.dealDamage(damage);
+ 
+    // VISUALS
+    AudioManager.playExplosionSound();
+    
+    // Large burst of particles
+    for (let i = 0; i < 4; i++) {
+        const jx = this.enemyCenterX + (Math.random() - 0.5) * 60;
+        const jy = this.enemyCenterY + (Math.random() - 0.5) * 60;
+        this.particleSystem.spawnClickSparks(jx, jy, true);
     }
+ 
+    // Floating damage
+    this.floatingTextManager.spawn(formatNumber(damage), this.enemyCenterX, this.enemyCenterY - 80, 0xffaa00);
+ 
+    // Heavy shake
+    this.enemyDisplay.triggerHitShake();
+    this.enemyDisplay.triggerHitShake(); // Extra punch for explosion
   }
 }

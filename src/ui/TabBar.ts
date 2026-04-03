@@ -1,12 +1,12 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { createTextStyle } from './styles/Typography';
 
-export type TabName = 'heroes' | 'ascension' | 'relics' | 'quests' | 'achievements' | 'settings';
+export type TabName = 'heroes' | 'ascension' | 'relics' | 'achievements' | 'settings';
 
 const TABS: { name: TabName; emoji: string; label: string }[] = [
   { name: 'heroes', emoji: '🦸', label: 'Heroes' },
   { name: 'ascension', emoji: '🌀', label: 'Ascend' },
   { name: 'relics', emoji: '🏺', label: 'Relics' },
-  { name: 'quests', emoji: '📋', label: 'Quests' },
   { name: 'achievements', emoji: '🏆', label: 'Achieve' },
   { name: 'settings', emoji: '⚙️', label: 'Settings' },
 ];
@@ -54,19 +54,29 @@ export class TabBar {
       this.tabBgs.push(tabBg);
       tabContainer.addChild(tabBg);
 
-      const emoji = new Text({ text: tab.emoji, style: { fontSize: 16 } });
+      const emoji = new Text({
+        text: tab.emoji,
+        style: createTextStyle({ fontSize: 28, fontWeight: 'normal', padding: 8 }),
+        resolution: window.devicePixelRatio || 2,
+      });
       emoji.anchor.set(0.5);
       emoji.x = tabW / 2;
-      emoji.y = h * 0.35;
+      emoji.y = h * 0.38;
       tabContainer.addChild(emoji);
 
       const label = new Text({
         text: tab.label,
-        style: { fontSize: 8, fill: 0x8899aa, align: 'center' }
+        style: createTextStyle({
+          fontSize: 16,
+          fill: 0x8899aa,
+          align: 'center',
+          padding: 4
+        }),
+        resolution: window.devicePixelRatio || 2
       });
       label.anchor.set(0.5);
       label.x = tabW / 2;
-      label.y = h * 0.72;
+      label.y = h * 0.76;
       tabContainer.addChild(label);
 
       const idx = i;

@@ -2,32 +2,56 @@ import { GameState } from './GameState';
 import { ASCENSION_UPGRADES } from '../config/AscensionData';
 import { EventBus, Events } from '../systems/EventBus';
 import { HeroManager } from './HeroManager';
+import { EnemyManager } from './EnemyManager';
 import { toBigNum } from '../systems/BigNumber';
 import { CrazyGamesSDK } from '../integrations/CrazyGamesSDK';
 
 export const AscensionManager = {
   canAscend(): boolean {
-    return GameState.stats.maxZoneReached >= 100;
+    const nextMilestone = (Math.floor(GameState.highestZoneAscended / 10) + 1) * 10;
+    // To ensure boss of nextMilestone is beaten, we must be AT zone (nextMilestone + 1)
+    const finalTarget = nextMilestone + 1;
+    return GameState.zone >= finalTarget;
   },
 
   getSigmaSoulsReward(): number {
-    const maxZone = GameState.stats.maxZoneReached;
-    if (maxZone < 75) return 0;
-    const presBonus = GameState.stats.totalAscensions * 0.1;
-    return Math.floor((maxZone - 75) * 0.5 * (1 + presBonus));
+    const currentZone = GameState.zone;
+    const highest = GameState.highestZoneAscended;
+    
+    let total = 0;
+    // Current milestone counts depend on BEATEN zones (zone - 1)
+    const currentMilestoneCount = Math.floor((currentZone - 1) / 10);
+    const highestMilestoneCount = Math.floor(highest / 10);
+
+    for (let i = highestMilestoneCount + 1; i <= currentMilestoneCount; i++) {
+        // Milestone 1 (Zone 10) = 5 * 2^0 = 5
+        // Milestone 2 (Zone 20) = 5 * 2^1 = 10
+        total += 5 * Math.pow(2, i - 1);
+    }
+    return total;
   },
 
   ascend(): boolean {
     if (!AscensionManager.canAscend()) return false;
 
     const soulsEarned = AscensionManager.getSigmaSoulsReward();
-    GameState.sigmaSOuls += soulsEarned;
+    
+    // Update sigma soul milestone persistence (multiples of 10 fully BEATEN)
+    const currentMilestoneZone = Math.floor((GameState.zone - 1) / 10) * 10;
+    if (currentMilestoneZone > GameState.highestZoneAscended) {
+        GameState.highestZoneAscended = currentMilestoneZone;
+    }
+    
+    // NOTE: relicLockZone is removed, we use stats.maxZoneEver now.
+
+    GameState.sigmaSouls += soulsEarned;
     GameState.stats.totalSigmaSouls += soulsEarned;
     GameState.stats.totalAscensions += 1;
 
     // Reset progress
     GameState.gold = toBigNum(0);
     GameState.totalGoldEarned = toBigNum(0);
+    GameState.totalClicks = 0;
     GameState.zone = 1;
     GameState.enemyKillCount = 0;
     GameState.dpsMultiplier = toBigNum(1);
@@ -37,10 +61,14 @@ export const AscensionManager = {
     GameState.bossTimerActive = false;
     GameState.bossTimeRemaining = 0;
 
-    // Reset heroes
-    for (const hero of GameState.heroes) {
-      hero.level = 0;
-    }
+    // Reset run-specific stats (Milestone update moved to top)
+    GameState.stats.maxZoneReached = 1;
+
+    // Reset heroes (First one unlocked, others locked)
+    GameState.heroes.forEach((hero, index) => {
+      hero.level = index === 0 ? 1 : 0;
+      hero.isUnlocked = index === 0;
+    });
 
     // Reset skills
     for (const skill of GameState.skills) {
@@ -53,6 +81,7 @@ export const AscensionManager = {
     AscensionManager.applyAllBonuses();
 
     HeroManager.recalculateDPS();
+    EnemyManager.initialSpawn();
     CrazyGamesSDK.happyTime();
     EventBus.emit(Events.ASCENSION_COMPLETE, soulsEarned);
     return true;
@@ -69,7 +98,7 @@ export const AscensionManager = {
     const currentLevel = AscensionManager.getUpgradeLevel(upgradeId);
     if (currentLevel >= upgDef.maxLevel) return false;
     const cost = upgDef.cost * (currentLevel + 1);
-    return GameState.sigmaSOuls >= cost;
+    return GameState.sigmaSouls >= cost;
   },
 
   buyUpgrade(upgradeId: string): boolean {
@@ -78,7 +107,7 @@ export const AscensionManager = {
     if (!upgDef) return false;
     const currentLevel = AscensionManager.getUpgradeLevel(upgradeId);
     const cost = upgDef.cost * (currentLevel + 1);
-    GameState.sigmaSOuls -= cost;
+    GameState.sigmaSouls -= cost;
 
     let entry = GameState.ascensionUpgrades.find(u => u.id === upgradeId);
     if (!entry) {

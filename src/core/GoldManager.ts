@@ -4,8 +4,9 @@ import { EventBus, Events } from '../systems/EventBus';
 import { BalanceConfig } from '../config/BalanceConfig';
 import { AscensionManager } from './AscensionManager';
 import { AchievementManager } from './AchievementManager';
+import { HeroManager } from './HeroManager';
 import { RelicManager } from './RelicManager';
-import { QuestManager } from './QuestManager';
+import { AdManager } from '../integrations/AdManager';
 
 export const GoldManager = {
   addGold(amount: Decimal): void {
@@ -26,15 +27,25 @@ export const GoldManager = {
   },
 
   awardKillGold(zone: number, isBoss: boolean): Decimal {
-    const base = BalanceConfig.goldPerKill(zone, GameState.goldMultiplier);
+    // getGoldMultiplier includes all bonuses (Relics, Ads, etc.)
+    const totalMult = GoldManager.getTotalMultiplier();
+    const base = BalanceConfig.goldPerKill(zone, totalMult);
+    
+    let reward = base;
+    if (isBoss) reward = reward.mul(5);
+    
+    GoldManager.addGold(reward);
+    return reward;
+  },
+
+  getTotalMultiplier(): Decimal {
     const ascMult = AscensionManager.getGoldAscensionMult();
     const achMult = 1 + AchievementManager.getTotalRewardMult('gold_mult');
     const relicMult = 1 + RelicManager.getTotalBonus('gold_mult');
-    let reward = base.mul(ascMult).mul(achMult).mul(relicMult);
-    if (isBoss) reward = reward.mul(5);
-    GoldManager.addGold(reward);
-    QuestManager.updateProgress('gold_earned_today', reward.toNumber());
-    return reward;
+    const adMult = AdManager.getGoldMultiplier();
+    
+    // INCLUDE GameState.goldMultiplier (Rizz Aura, etc.)
+    return toBigNum(ascMult * achMult * relicMult * adMult).mul(GameState.goldMultiplier);
   },
 
   setMultiplier(multiplier: number): void {

@@ -1,6 +1,8 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { createTextStyle } from '../styles/Typography';
 import { GameState } from '../../core/GameState';
 import { EventBus, Events } from '../../systems/EventBus';
+import { RELIC_POOL, RARITY_ORDER, RARITY_MULTIPLIERS } from '../../core/RelicManager';
 
 const RARITY_COLORS: Record<string, number> = {
   Bronze: 0xcd7f32,
@@ -20,6 +22,7 @@ export class RelicScreen {
   private dragStartY: number = 0;
   private dragStartScrollY: number = 0;
   private totalContentH: number = 0;
+  private isDirty: boolean = true;
 
   constructor(width: number, height: number) {
     this.panelW = width;
@@ -28,7 +31,7 @@ export class RelicScreen {
 
     const bg = new Graphics();
     bg.rect(0, 0, width, height);
-    bg.fill(0x060d16);
+    bg.fill(0x0d1b2a);
     this.container.addChild(bg);
 
     this.scrollContainer = new Container();
@@ -41,9 +44,9 @@ export class RelicScreen {
     this.scrollContainer.mask = this.maskGraphic;
 
     this.setupScroll();
-    this.build();
 
-    EventBus.on(Events.RELIC_DROPPED, () => this.build());
+    EventBus.on(Events.RELIC_DROPPED, () => { this.isDirty = true; });
+    EventBus.on(Events.RELIC_FUSED, () => { this.isDirty = true; });
   }
 
   private setupScroll(): void {
@@ -62,68 +65,110 @@ export class RelicScreen {
   }
 
   private build(): void {
-    while (this.scrollContainer.children.length > 0) this.scrollContainer.removeChildAt(0);
-    let yOffset = 10;
-
-    const header = new Text({
-      text: `🏺 Relics (${GameState.relics.length}/10)`,
-      style: { fontSize: 16, fill: 0xffd700, fontWeight: 'bold' }
-    });
-    header.x = 20;
-    header.y = yOffset;
-    this.scrollContainer.addChild(header);
-    yOffset += 36;
-
-    if (GameState.relics.length === 0) {
-      const empty = new Text({
-        text: 'No relics yet.\nDefeat bosses to earn relics!',
-        style: { fontSize: 13, fill: 0x8899aa, align: 'center' }
-      });
-      empty.anchor.set(0.5, 0);
-      empty.x = this.panelW / 2;
-      empty.y = yOffset + 40;
-      this.scrollContainer.addChild(empty);
-      this.totalContentH = yOffset + 120;
-      return;
+    while (this.scrollContainer.children.length > 0) {
+      this.scrollContainer.removeChildAt(0);
     }
 
-    for (const relic of GameState.relics) {
-      const rarityColor = RARITY_COLORS[relic.rarity] ?? 0xffffff;
-      const card = new Graphics();
-      card.roundRect(10, 0, this.panelW - 20, 60, 8);
-      card.fill(0x0d1926);
-      card.roundRect(10, 0, this.panelW - 20, 60, 8);
-      card.stroke({ width: 2, color: rarityColor });
-      card.y = yOffset;
-      this.scrollContainer.addChild(card);
+    let yOffset = 16;
+    const header = new Text({
+      text: `🏺 Relic Collection (${GameState.relics.length} Active Types)`,
+      style: createTextStyle({ fontSize: 22, fill: 0xffd700 }),
+      resolution: window.devicePixelRatio || 2,
+    });
+    header.x = 24;
+    header.y = yOffset;
+    this.scrollContainer.addChild(header);
+    yOffset += 50;
 
-      const emojiText = new Text({ text: relic.emoji, style: { fontSize: 22 } });
-      emojiText.x = 22;
-      emojiText.y = yOffset + 16;
-      this.scrollContainer.addChild(emojiText);
+    // Loop through ALL possible relics in the pool
+    for (const poolItem of RELIC_POOL) {
+      // Loop through ALL possible rarities for each
+      for (const rarity of RARITY_ORDER) {
+        // Check if player OWNS this specific relic + rarity
+        const ownedInstance = GameState.relics.find(r => r.name === poolItem.name && r.rarity === rarity);
+        const isOwned = !!ownedInstance;
+        
+        const rarityColor = RARITY_COLORS[rarity] ?? 0xffffff;
+        const card = new Graphics();
+        card.roundRect(16, 0, this.panelW * 0.9, 102, 12);
+        
+        if (isOwned) {
+          card.fill(0x0d1926);
+          card.stroke({ width: 3, color: rarityColor });
+          card.alpha = 1;
+        } else {
+          card.fill(0x0a141d);
+          card.stroke({ width: 1.5, color: 0x334455 });
+          card.alpha = 0.4; // Grisé / Ghost look
+        }
+        
+        card.y = yOffset;
+        this.scrollContainer.addChild(card);
 
-      const nameText = new Text({
-        text: `${relic.name}`,
-        style: { fontSize: 13, fill: rarityColor, fontWeight: 'bold' }
-      });
-      nameText.x = 56;
-      nameText.y = yOffset + 8;
-      this.scrollContainer.addChild(nameText);
+        const emojiText = new Text({
+          text: poolItem.emoji,
+          style: createTextStyle({ fontSize: 36, fontWeight: 'normal', padding: 8 }),
+          resolution: window.devicePixelRatio || 2,
+        });
+        emojiText.x = 32;
+        emojiText.y = yOffset + 24;
+        this.scrollContainer.addChild(emojiText);
 
-      const statLabel = relic.statType.replace('_mult', '').replace('_', ' ').toUpperCase();
-      const statText = new Text({
-        text: `+${Math.round(relic.statValue * 100)}% ${statLabel}  [${relic.rarity}]`,
-        style: { fontSize: 11, fill: 0x99aabb }
-      });
-      statText.x = 56;
-      statText.y = yOffset + 32;
-      this.scrollContainer.addChild(statText);
+        const nameText = new Text({
+          text: poolItem.name,
+          style: createTextStyle({ fontSize: 18, fill: isOwned ? rarityColor : 0x778899 }),
+          resolution: window.devicePixelRatio || 2,
+        });
+        nameText.x = 88;
+        nameText.y = yOffset + 18;
+        this.scrollContainer.addChild(nameText);
 
-      yOffset += 68;
+        const statLabel = poolItem.statType.replace('_mult', '').replace('_', ' ').toUpperCase();
+        const baseVal = poolItem.baseValue * RARITY_MULTIPLIERS[rarity];
+        const displayVal = ownedInstance ? (baseVal * ownedInstance.count * 100) : (baseVal * 100);
+        
+        const statText = new Text({
+          text: `+${Math.round(displayVal)}% ${statLabel}  [${rarity.toUpperCase()}]`,
+          style: createTextStyle({ fontSize: 14, fill: isOwned ? 0x99aabb : 0x556677 }),
+          resolution: window.devicePixelRatio || 2,
+        });
+        statText.x = 88;
+        statText.y = yOffset + 50;
+        this.scrollContainer.addChild(statText);
+
+        // DIAMOND QUANTITY BADGE
+        if (isOwned && ownedInstance.count > 1) {
+          const badge = new Graphics();
+          badge.circle(this.panelW * 0.9 - 25, 30, 20);
+          badge.fill(0xff4444);
+          badge.y = yOffset;
+          this.scrollContainer.addChild(badge);
+
+          const qText = new Text({
+            text: `x${ownedInstance.count}`,
+            style: createTextStyle({ fontSize: 14, fill: 0xffffff, fontWeight: '800' }),
+            resolution: window.devicePixelRatio || 2,
+          });
+          qText.anchor.set(0.5);
+          qText.x = this.panelW * 0.9 - 25;
+          qText.y = yOffset + 30;
+          this.scrollContainer.addChild(qText);
+        }
+
+        yOffset += 114;
+      }
+      
+      // Extra space between different relic types
+      yOffset += 20;
     }
 
     this.totalContentH = yOffset + 20;
   }
 
-  update(_deltaSeconds: number): void {}
+  update(_deltaSeconds: number): void {
+    if (this.container.visible && this.isDirty) {
+      this.build();
+      this.isDirty = false;
+    }
+  }
 }

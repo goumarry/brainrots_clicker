@@ -1,4 +1,5 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { createTextStyle } from './styles/Typography';
 
 const TUTORIAL_KEY = 'brainrot_tutorial_done';
 
@@ -46,8 +47,8 @@ export class TutorialOverlay {
     this.container.addChild(this.overlay);
 
     // Tutorial bubble (centered)
-    const bW = 420;
-    const bH = 220;
+    const bW = 630; // 420 * 1.5
+    const bH = 330; // 220 * 1.5
     const bX = (gameW - bW) / 2;
     const bY = (gameH - bH) / 2;
 
@@ -59,60 +60,74 @@ export class TutorialOverlay {
     this.container.addChild(this.bubble);
 
     // Emoji
-    this.emojiText = new Text({ text: '👆', style: { fontSize: 48 } });
+    this.emojiText = new Text({
+      text: '👆',
+      style: createTextStyle({ fontSize: 72, fontWeight: 'normal', padding: 8 }),
+      resolution: 3,
+    });
     this.emojiText.anchor.set(0.5);
     this.emojiText.x = gameW / 2;
-    this.emojiText.y = bY + 56;
+    this.emojiText.y = bY + 84;
     this.emojiText.eventMode = 'none';
     this.container.addChild(this.emojiText);
 
     // Message
     this.messageText = new Text({
       text: '',
-      style: {
-        fontSize: 18,
+      style: createTextStyle({
+        fontSize: 26,
         fill: 0xffffff,
         align: 'center',
         wordWrap: true,
-        wordWrapWidth: bW - 40,
-        lineHeight: 26,
-      }
+        wordWrapWidth: bW - 60,
+        lineHeight: 38,
+        padding: 8,
+      }),
+      resolution: 3,
     });
     this.messageText.anchor.set(0.5, 0);
     this.messageText.x = gameW / 2;
-    this.messageText.y = bY + 106;
+    this.messageText.y = bY + 150;
     this.messageText.eventMode = 'none';
     this.container.addChild(this.messageText);
 
     // Next button
     this.nextBtn = new Graphics();
-    this.nextBtn.roundRect(bX + bW / 2 - 70, bY + bH - 54, 140, 36, 8);
+    this.nextBtn.roundRect(bX + bW / 2 - 100, bY + bH - 80, 200, 54, 12);
     this.nextBtn.fill(0x4a9eff);
     this.nextBtn.eventMode = 'static';
     this.nextBtn.cursor = 'pointer';
     this.container.addChild(this.nextBtn);
     this.nextBtn.on('pointerdown', () => this.nextStep());
 
-    this.nextBtnText = new Text({ text: 'Next ▶', style: { fontSize: 16, fill: 0xffffff, fontWeight: 'bold' } });
+    this.nextBtnText = new Text({
+      text: 'Next ▶',
+      style: createTextStyle({ fontSize: 24, fill: 0xffffff, padding: 8 }),
+      resolution: 3,
+    });
     this.nextBtnText.anchor.set(0.5);
     this.nextBtnText.x = bX + bW / 2;
-    this.nextBtnText.y = bY + bH - 36;
+    this.nextBtnText.y = bY + bH - 53;
     this.nextBtnText.eventMode = 'none';
     this.container.addChild(this.nextBtnText);
 
     // Skip button
     this.skipBtn = new Graphics();
-    this.skipBtn.rect(bX + bW - 70, bY + 8, 62, 24);
+    this.skipBtn.rect(bX + bW - 100, bY + 12, 88, 36);
     this.skipBtn.fill({ color: 0x334455, alpha: 0.8 });
     this.skipBtn.eventMode = 'static';
     this.skipBtn.cursor = 'pointer';
     this.container.addChild(this.skipBtn);
     this.skipBtn.on('pointerdown', () => this.finish());
 
-    const skipText = new Text({ text: 'Skip', style: { fontSize: 12, fill: 0x8899aa } });
+    const skipText = new Text({
+      text: 'Skip',
+      style: createTextStyle({ fontSize: 20, fill: 0x8899aa, padding: 8 }),
+      resolution: 3,
+    });
     skipText.anchor.set(0.5);
-    skipText.x = bX + bW - 39;
-    skipText.y = bY + 20;
+    skipText.x = bX + bW - 56;
+    skipText.y = bY + 30;
     skipText.eventMode = 'none';
     this.container.addChild(skipText);
 

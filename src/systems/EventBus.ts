@@ -56,7 +56,8 @@ export const Events = {
   ASCENSION_COMPLETE: 'ascension:complete',
   ACHIEVEMENT_UNLOCKED: 'achievement:unlocked',
   RELIC_DROPPED: 'relic:dropped',
-  QUEST_COMPLETED: 'quest:completed',
-  QUEST_PROGRESS: 'quest:progress',
+  RELIC_FUSED: 'relic:fused',
   STATS_UPDATED: 'stats:updated',
+  AUTO_CLICK: 'click:auto',
+  SKILL_ANIMATION_TRIGGERED: 'skill:animation_triggered',
 } as const;

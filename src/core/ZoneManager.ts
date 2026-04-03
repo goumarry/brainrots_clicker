@@ -2,7 +2,6 @@ import { GameState } from './GameState';
 import { EventBus, Events } from '../systems/EventBus';
 import { BalanceConfig } from '../config/BalanceConfig';
 import { EnemyManager } from './EnemyManager';
-import { QuestManager } from './QuestManager';
 import { AchievementManager } from './AchievementManager';
 
 export const ZoneManager = {
@@ -20,7 +19,9 @@ export const ZoneManager = {
     if (GameState.zone > GameState.stats.maxZoneReached) {
       GameState.stats.maxZoneReached = GameState.zone;
     }
-    QuestManager.updateProgress('zone_reached', GameState.zone);
+    if (GameState.zone > GameState.stats.maxZoneEver) {
+      GameState.stats.maxZoneEver = GameState.zone;
+    }
     AchievementManager.checkAll();
 
     EventBus.emit(Events.ZONE_CHANGED, GameState.zone);

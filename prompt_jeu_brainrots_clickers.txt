@@ -1,0 +1,585 @@
+📋 Cahier des Charges — BrainrotClicker
+Un Idle/Clicker Game inspiré de Clicker Heroes, univers Brainrot
+🧠 1. CONCEPT & VISION
+1.1 Pitch
+
+    Un clicker/idle game où le joueur doit vaincre des ennemis issus de la culture brainrot (Skibidi Toilet, Sigma, Ohio, Fanum Tax, Rizz, etc.) en cliquant et en recrutant des héros brainrot qui infligent des dégâts automatiques (DPS). Progression infinie, prestige, et montée en puissance addictive.
+
+1.2 Cible
+
+    Joueurs casual 13-25 ans
+    Fans de memes / culture brainrot
+    Plateforme : Web (CrazyGames)
+
+1.3 Références
+
+    Clicker Heroes
+    Cookie Clicker
+    Tap Titans
+
+🎮 2. GAME DESIGN DÉTAILLÉ
+2.1 Core Loop
+
+text
+
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│   CLICK ──▶ KILL ENEMIES ──▶ EARN BRAINCOINS       │
+│     │                            │                  │
+│     │                            ▼                  │
+│     │                    BUY/UPGRADE HEROES          │
+│     │                            │                  │
+│     │                            ▼                  │
+│     │                     MORE DPS + CPC             │
+│     │                            │                  │
+│     │                            ▼                  │
+│     │                   HARDER ENEMIES               │
+│     │                            │                  │
+│     └────────────────────────────┘                  │
+│                                                     │
+│          ──▶ PRESTIGE (reset + permanent boost)     │
+└─────────────────────────────────────────────────────┘
+
+2.2 Mécaniques Principales
+🖱️ A) Le Click
+Élément	Détail
+Click Damage (CPC)	Dégâts de base par click, augmentables
+Critical Click	% de chance de crit (x3 à x10)
+Click Storm	Skill temporaire : auto-click x20/sec pendant 30s
+Combo Counter	Multiplicateur qui monte avec les clicks rapides
+🦸 B) Les Héros Brainrot (système central)
+
+Chaque héros a :
+
+    Coût d'achat (scaling exponentiel)
+    DPS de base
+    Niveau (upgradable à l'infini)
+    Milestones (tous les 25 niveaux → unlock skill passif ou boost)
+    Rareté : Common / Rare / Epic / Legendary / Mythic
+
+Roster initial (15-20 héros) :
+#	Héros	Tier	DPS Base	Thème
+1	Baby Gronk	Common	1	Starter
+2	Skibidi Toilet	Common	5	Auto-flush damage
+3	Rizz God	Common	25	Charm DPS
+4	Sigma Wolf	Rare	100	Grindset buff
+5	Ohio Final Boss	Rare	400	AoE damage
+6	Fanum Tax Collector	Rare	1.5K	Steal HP
+7	Gyatt Guardian	Epic	6K	Shield + DPS
+8	Mewing Master	Epic	25K	Silent DPS
+9	Kai Cenat Clone	Epic	100K	Rage multiplier
+10	Duke Dennis	Legendary	500K	Rizz aura
+11	Cameraman Elite	Legendary	2M	Anti-Skibidi
+12	Livvy Dunne	Legendary	10M	Gymnastic crits
+13	IShowSpeed	Mythic	50M	SPEED boost all
+14	Quandale Dingle	Mythic	500M	Chaos damage
+15	The Brainrot King	Mythic	5B	Ultimate DPS
+👾 C) Les Ennemis
+
+    Ennemis normaux : 10 par zone, HP scaling
+    Boss : tous les 5 niveaux, timer de 30s pour le tuer
+    Boss Raid (tous les 50 niveaux) : boss spécial avec mécanique unique
+
+Formule HP des ennemis :
+
+text
+
+HP(zone) = base_hp * 1.55^zone * (1 + floor(zone/5) * boss_mult)
+
+Exemples d'ennemis :
+
+    Zone 1-10 : NPC Normies
+    Zone 11-25 : Cursed TikTokers
+    Zone 26-50 : Skibidi Army
+    Zone 51-100 : Ohio Monsters
+    Zone 100+ : Sigma Overlords
+    Zone 200+ : Brainrot Titans
+    Zone 500+ : Ascended Memes
+
+⚡ D) Skills Actifs (Cooldown-based)
+Skill	Effet	Cooldown	Durée
+Skibidi Rush	Auto-click x30	3 min	30s
+Sigma Grindset	DPS x5	5 min	60s
+Ohio Mode	Tout peut arriver (random buff x2-x100)	10 min	15s
+Fanum Tax	Vole 10% HP de l'ennemi	2 min	Instant
+Rizz Aura	Gold x10	8 min	45s
+GYATT Bomb	Nuke (damage = 10min de DPS)	15 min	Instant
+Mewing Focus	Crits garantis	5 min	20s
+🔄 E) Système de Prestige — "BRAINROT ASCENSION"
+Élément	Détail
+Condition	Disponible à partir de la zone 100
+Monnaie	Sigma Souls (earned based on zone reached)
+Reset	Gold, niveaux héros, zone — tout reset
+Keep	Sigma Souls, Ascension upgrades, achievements
+Arbre de talents	5 branches avec upgrades permanents
+
+Formule Sigma Souls :
+
+text
+
+souls = floor((zone_max - 75) * 0.5 * (1 + prestige_bonus))
+
+Arbre d'Ascension (5 branches) :
+
+text
+
+           🧠 BRAINROT TREE
+          /    |    \    \     \
+     💪      💰     ⚡    🎯     🌀
+    SIGMA   GRIND  SPEED  CRIT  CHAOS
+    
+💪 Sigma Path    → +DPS%, +Hero damage
+💰 Grind Path    → +Gold%, +Idle earnings  
+⚡ Speed Path    → -Cooldowns, +Click speed
+🎯 Crit Path     → +Crit%, +Crit damage
+🌀 Chaos Path    → Random procs, Lucky drops
+
+🎁 F) Systèmes Secondaires
+
+1. Achievements (100+)
+
+    "First Blood" → Kill 1 enemy
+    "Skibidi Slayer" → Kill 1000 Skibidi
+    "Sigma Grindset" → Reach zone 100 without buying heroes
+    Chaque achievement donne un bonus permanent
+
+2. Reliques (Drop des boss)
+
+    Items passifs avec stats random
+    Rareté : Bronze / Silver / Gold / Diamond
+    Exemple : "Skibidi Plunger" → +15% DPS, +5% Gold
+
+3. Daily Rewards / Quests
+
+    Login streak → rewards croissants
+    3 daily quests : "Kill 500 enemies", "Reach zone X", etc.
+    Reward : Gems (premium currency F2P friendly)
+
+4. Offline Progress
+
+    Le jeu calcule les gains pendant l'absence
+    Max 8h d'idle earnings (upgradable via Ascension)
+
+5. Mercenaires (Late game)
+
+    Envoyer des héros en mission pour du loot
+    Missions de 1h à 24h
+
+2.3 Économie & Balancing
+
+text
+
+Gold earning rate:
+gold_per_kill = base_gold * zone^1.5 * gold_multiplier
+
+Hero cost scaling:  
+cost(level) = base_cost * 1.07^level
+
+DPS scaling:
+hero_dps(level) = base_dps * level * (1 + milestone_bonus)
+
+Zone HP scaling:
+enemy_hp(zone) = 10 * 1.55^zone
+boss_hp(zone) = enemy_hp(zone) * 10
+
+🎨 3. DIRECTION ARTISTIQUE
+3.1 Style Visuel
+
+    Pixel Art HD ou Cartoon 2D style Newgrounds/Flash era
+    Couleurs vives, saturées, "terminally online" aesthetic
+    Animations exagérées et meme-worthy
+    Effets de particules satisfaisants sur les clicks
+
+3.2 UI Layout
+
+text
+
+┌──────────────────────────────────────────────────┐
+│  [Zone 42]  [Boss HP Bar]              [⚙️][🏆] │
+│                                                  │
+│  ┌──────────────────────────────────────┐       │
+│  │                                      │       │
+│  │         ZONE D'AFFICHAGE             │       │
+│  │        (Ennemi au centre)            │       │
+│  │     ← Background parallax →          │       │
+│  │                                      │       │
+│  │      💰 +1.5M    💰 +2.3M           │       │
+│  │         (floating numbers)           │       │
+│  │                                      │       │
+│  │    [ENNEMI SPRITE + HP BAR]          │       │
+│  │                                      │       │
+│  └──────────────────────────────────────┘       │
+│                                                  │
+│  [⚡Skills Bar: 🔴🔵🟢🟡🟣🔶⚪]               │
+│                                                  │
+│  ┌──────────────────────────────────────┐       │
+│  │  📊 DPS: 1.5M/s    💰 Gold: 45.2M  │       │
+│  │                                      │       │
+│  │  HERO PANEL (scrollable)             │       │
+│  │  ┌────────────────────────────┐      │       │
+│  │  │ 🧑 Baby Gronk    Lv.150   │      │       │
+│  │  │ DPS: 500K  [UPGRADE 2.5M] │      │       │
+│  │  ├────────────────────────────┤      │       │
+│  │  │ 🚽 Skibidi Toilet Lv.100  │      │       │
+│  │  │ DPS: 1.2M  [UPGRADE 10M]  │      │       │
+│  │  ├────────────────────────────┤      │       │
+│  │  │ 🐺 Sigma Wolf    Lv.75    │      │       │
+│  │  │ DPS: 3.5M  [UPGRADE 50M]  │      │       │
+│  │  └────────────────────────────┘      │       │
+│  └──────────────────────────────────────┘       │
+│                                                  │
+│  [HEROES] [ASCENSION] [RELICS] [QUESTS] [SHOP]  │
+└──────────────────────────────────────────────────┘
+
+3.3 Audio
+
+    BGM : Lo-fi beats / chiptune avec des samples brainrot
+    SFX : Click satisfaisants, level-up, boss alert, "GYATT" sound effects
+    Brainrot voice lines occasionnelles (Skibidi, Sigma, etc.)
+
+💻 4. STACK TECHNIQUE
+4.1 Pourquoi cette stack ?
+
+    CrazyGames requiert : HTML5, WebGL, bon perf navigateur, responsive.
+    Le jeu est 2D, UI-heavy, beaucoup de nombres, pas de physique complexe.
+
+4.2 Stack Retenue
+
+text
+
+┌─────────────────────────────────────────────────┐
+│              🏆 STACK CHOISIE                    │
+├─────────────────────────────────────────────────┤
+│                                                  │
+│  🎮 Engine    : PixiJS + custom OU un engine plus récent et plus joli de préférence                 │
+│  📝 Language  : TypeScript                       │
+│  🏗️ Build     : Vite                            │
+│  🎨 Assets    : Aseprite (pixel art) / Spine 2D │
+│  🔊 Audio     : Howler.js                        │
+│  💾 Save      : LocalStorage + Cloud Save (API) │
+│  🔢 Big Nums  : break_infinity.js               │
+│  📦 Bundler   : Vite → single HTML/JS bundle    │
+│  🌐 SDK       : CrazyGames SDK                  │
+│  📊 Analytics : CrazyGames Analytics             │
+│                                                  │
+└─────────────────────────────────────────────────┘
+
+4.3 Justification détaillée
+Choix	Raison
+Phaser 3	Framework mature, WebGL+Canvas, parfait pour 2D, énorme communauté, compatible CrazyGames nativement, gestion sprites/animations/input/scenes built-in
+TypeScript	Type safety indispensable pour un jeu avec beaucoup de data (héros, upgrades, formules), autocomplétion, refactoring facile
+Vite	Build ultra rapide, HMR, output optimisé, tree-shaking, facile à config
+break_infinity.js	Librairie pour gérer les nombres au-delà de 1e308 (indispensable pour un idle game), supporte les opérations mathématiques
+Howler.js	Audio cross-browser fiable, sprite audio, pool, WebAudio API
+LocalStorage	Save rapide côté client, suffisant pour MVP
+CrazyGames SDK	Obligatoire pour ads, events, leaderboard, game loading
+4.4 Architecture du Projet
+
+text
+
+brainrot-clicker/
+├── public/
+│   ├── assets/
+│   │   ├── sprites/
+│   │   │   ├── heroes/
+│   │   │   ├── enemies/
+│   │   │   ├── effects/
+│   │   │   └── ui/
+│   │   ├── audio/
+│   │   │   ├── bgm/
+│   │   │   ├── sfx/
+│   │   │   └── voices/
+│   │   └── fonts/
+│   └── index.html
+├── src/
+│   ├── main.ts                    # Entry point
+│   ├── config/
+│   │   ├── GameConfig.ts          # Phaser config
+│   │   ├── BalanceConfig.ts       # Toutes les formules/constantes
+│   │   ├── HeroData.ts            # Définitions des héros
+│   │   ├── EnemyData.ts           # Définitions des ennemis
+│   │   ├── SkillData.ts           # Définitions des skills
+│   │   ├── AscensionData.ts       # Arbre d'ascension
+│   │   └── AchievementData.ts     # Achievements
+│   ├── scenes/
+│   │   ├── BootScene.ts           # Preload assets
+│   │   ├── MenuScene.ts           # Main menu
+│   │   ├── GameScene.ts           # Core gameplay
+│   │   ├── AscensionScene.ts      # Prestige screen
+│   │   └── UIScene.ts             # HUD overlay (parallel scene)
+│   ├── core/
+│   │   ├── GameState.ts           # State central (singleton)
+│   │   ├── ClickManager.ts        # Gestion des clicks + combos
+│   │   ├── DamageManager.ts       # Calcul DPS + dégâts
+│   │   ├── EnemyManager.ts        # Spawn, HP, transitions
+│   │   ├── HeroManager.ts         # Achat, upgrade, milestones
+│   │   ├── SkillManager.ts        # Cooldowns, activations
+│   │   ├── ZoneManager.ts         # Progression zones/boss
+│   │   ├── GoldManager.ts         # Économie
+│   │   ├── AscensionManager.ts    # Prestige logic
+│   │   ├── AchievementManager.ts  # Tracking achievements
+│   │   ├── RelicManager.ts        # Drop system
+│   │   ├── QuestManager.ts        # Daily quests
+│   │   ├── OfflineManager.ts      # Calcul gains offline
+│   │   └── SaveManager.ts         # Save/Load
+│   ├── ui/
+│   │   ├── components/
+│   │   │   ├── HeroPanel.ts       # Liste héros scrollable
+│   │   │   ├── HeroCard.ts        # Carte individuelle héro
+│   │   │   ├── SkillBar.ts        # Barre de skills
+│   │   │   ├── BossHPBar.ts       # HP bar boss
+│   │   │   ├── FloatingText.ts    # Nombres flottants
+│   │   │   ├── TabBar.ts          # Navigation tabs
+│   │   │   ├── UpgradeButton.ts   # Bouton upgrade réutilisable
+│   │   │   ├── Tooltip.ts         # Tooltips info
+│   │   │   └── Modal.ts           # Popups/modals
+│   │   └── screens/
+│   │       ├── HeroScreen.ts
+│   │       ├── AscensionScreen.ts
+│   │       ├── RelicScreen.ts
+│   │       ├── QuestScreen.ts
+│   │       ├── ShopScreen.ts
+│   │       ├── SettingsScreen.ts
+│   │       └── AchievementScreen.ts
+│   ├── entities/
+│   │   ├── Hero.ts                # Classe Hero
+│   │   ├── Enemy.ts               # Classe Enemy
+│   │   ├── Boss.ts                # Classe Boss (extends Enemy)
+│   │   ├── Relic.ts               # Classe Relic
+│   │   └── Skill.ts               # Classe Skill
+│   ├── systems/
+│   │   ├── EventBus.ts            # Event system (pub/sub)
+│   │   ├── BigNumber.ts           # Wrapper break_infinity
+│   │   ├── NumberFormatter.ts     # 1.5M, 2.3B, etc.
+│   │   ├── TimeUtils.ts           # Formatage temps
+│   │   └── RandomUtils.ts         # RNG seedable
+│   ├── integrations/
+│   │   ├── CrazyGamesSDK.ts       # Wrapper SDK CrazyGames
+│   │   └── AdManager.ts           # Rewarded ads logic
+│   └── types/
+│       ├── GameTypes.ts           # Interfaces/Types globaux
+│       ├── HeroTypes.ts
+│       ├── EnemyTypes.ts
+│       └── SaveTypes.ts
+├── tests/
+│   ├── balance.test.ts            # Tests des formules
+│   ├── save.test.ts               # Tests save/load
+│   └── bignum.test.ts             # Tests big numbers
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+└── README.md
+
+4.5 Patterns Architecturaux
+
+typescript
+
+// 🔥 Event-Driven Architecture
+// Tous les managers communiquent via un EventBus
+
+// EventBus.ts
+type GameEvent = 
+  | 'enemy:killed' 
+  | 'enemy:spawned'
+  | 'hero:purchased' 
+  | 'hero:upgraded'
+  | 'hero:milestone'
+  | 'zone:changed' 
+  | 'zone:boss'
+  | 'gold:changed' 
+  | 'gold:earned'
+  | 'skill:activated' 
+  | 'skill:ready'
+  | 'click:damage'
+  | 'click:critical'
+  | 'ascension:start'
+  | 'ascension:complete'
+  | 'achievement:unlocked'
+  | 'relic:dropped'
+  | 'save:complete'
+  | 'offline:calculated';
+
+// 🔥 State Machine pour les ennemis
+enum EnemyState {
+  ENTERING,    // Animation d'entrée
+  IDLE,        // Attend les dégâts
+  HIT,         // Flash quand touché
+  DYING,       // Animation de mort
+  DEAD         // Transition vers suivant
+}
+
+// 🔥 GameState centralisé (Single Source of Truth)
+interface GameState {
+  gold: Decimal;
+  totalGold: Decimal;
+  currentZone: number;
+  maxZone: number;
+  enemyIndex: number;
+  heroes: HeroState[];
+  skills: SkillState[];
+  ascension: AscensionState;
+  relics: RelicState[];
+  achievements: string[];
+  stats: PlayerStats;
+  settings: GameSettings;
+  lastSaveTime: number;
+}
+
+🔧 5. INTÉGRATION CRAZYGAMES
+5.1 Requirements CrazyGames
+Requirement	Implémentation
+HTML5/WebGL	✅ Phaser 3
+Responsive	✅ Scale manager Phaser + CSS
+No external servers	✅ LocalStorage (+ CG cloud save)
+SDK Integration	✅ CrazyGames SDK v3
+Rewarded Ads	✅ Bonus gold/temp boost après ad
+Game Loading Event	✅ CrazyGames.game.sdkGameLoadingStart/Stop()
+Gameplay Start	✅ CrazyGames.game.gameplayStart()
+Happy Time	✅ Sur boss kill, ascension
+Max bundle size	✅ < 50MB target
+No iframe content	✅
+5.2 Rewarded Ads Strategy
+
+typescript
+
+// Moments de pub rewarded (opt-in du joueur) :
+const AD_MOMENTS = {
+  DOUBLE_GOLD_30MIN:  "Regarde une pub → Gold x2 pendant 30min",
+  INSTANT_SKILL_RESET: "Regarde une pub → Reset tous les cooldowns",
+  OFFLINE_BONUS:       "Regarde une pub → Double offline earnings",
+  LUCKY_RELIC:         "Regarde une pub → Relic gratuite",
+  BOSS_RETRY:          "Raté le boss ? Pub → 2ème chance",
+};
+
+📅 6. PLANNING DE DÉVELOPPEMENT
+Phase 1 — MVP Core (2 semaines)
+
+text
+
+✅ Setup projet (Vite + Phaser + TS)
+✅ Click sur ennemi → dégâts → mort → suivant
+✅ Gold system
+✅ 5 premiers héros achetables + upgradables
+✅ DPS automatique
+✅ Zone progression (50 zones)
+✅ Boss tous les 5 niveaux
+✅ UI de base (HP bar, gold, hero panel)
+✅ Floating damage numbers
+✅ Save/Load LocalStorage
+
+Phase 2 — Depth (2 semaines)
+
+text
+
+✅ 15 héros complets avec milestones
+✅ 7 skills actifs avec cooldowns
+✅ Système de crit
+✅ 200 zones avec scaling correct
+✅ Formattage big numbers
+✅ break_infinity.js intégration
+✅ Offline progress
+✅ Sound effects + BGM
+✅ Animations sprites (idle, attack, death)
+
+Phase 3 — Prestige & Meta (1.5 semaines)
+
+text
+
+✅ Ascension system complet
+✅ Arbre de talents (5 branches)
+✅ Sigma Souls economy
+✅ Achievements (50+)
+✅ Reliques (drop system)
+✅ Daily quests
+
+Phase 4 — Polish & CrazyGames (1.5 semaines)
+
+text
+
+✅ CrazyGames SDK integration
+✅ Rewarded ads
+✅ Responsive design (mobile/desktop)
+✅ Performance optimization
+✅ Balancing pass
+✅ Juice (screenshake, particles, flash)
+✅ Tutorial / onboarding
+✅ Bug fixing
+✅ Build final + soumission CrazyGames
+
+Total : ~7 semaines pour un solo dev
+📊 7. KPIs & MÉTRIQUES
+Métrique	Objectif
+D1 Retention	> 40%
+D7 Retention	> 15%
+Avg Session	> 8 minutes
+Ad View Rate	> 30% des joueurs
+First Ascension	< 2h de jeu
+CrazyGames Rating	> 8.0/10
+🚀 8. POST-LAUNCH ROADMAP
+Update	Contenu
+v1.1	+10 héros, +100 zones, Clan system
+v1.2	Events saisonniers (Christmas Brainrot, etc.)
+v1.3	Transcendance (2ème prestige layer)
+v1.4	PvP Arena (compare DPS avec autres joueurs)
+v1.5	Héros custom / skin system
+🧪 9. COMMANDES POUR DÉMARRER
+
+bash
+
+# Init projet
+npm create vite@latest brainrot-clicker -- --template vanilla-ts
+cd brainrot-clicker
+
+# Dépendances
+npm install phaser
+npm install break_infinity.js
+npm install howler
+npm install --save-dev @types/howler
+
+# CrazyGames SDK
+npm install @crazygames/sdk
+
+# Dev
+npm run dev
+
+# Build pour CrazyGames
+npm run build
+# → zip le dossier dist/ et upload sur CrazyGames Developer Portal
+
+typescript
+
+// vite.config.ts
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  base: './',
+  build: {
+    target: 'es2017',
+    outDir: 'dist',
+    assetsInlineLimit: 0,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined, // Single bundle
+      },
+    },
+  },
+});
+
+✅ 10. CHECKLIST FINALE PRE-SUBMIT CRAZYGAMES
+
+text
+
+☐ Le jeu load en < 5 secondes
+☐ Pas d'erreur console
+☐ Responsive 16:9 et mobile
+☐ SDK CrazyGames initialisé
+☐ gameLoadingStart/Stop appelés
+☐ gameplayStart/Stop appelés
+☐ Rewarded ads fonctionnelles
+☐ Pas de contenu NSFW
+☐ Save persistante
+☐ Taille bundle < 50MB
+☐ Pas de requête vers des serveurs externes
+☐ Fonctionne sur Chrome, Firefox, Edge, Safari
+☐ Thumbnail 512x512 et 800x450 prêtes
+☐ Description et tags remplis

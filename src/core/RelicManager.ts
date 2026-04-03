@@ -2,9 +2,12 @@ import { GameState, RelicInstance } from './GameState';
 import { EventBus, Events } from '../systems/EventBus';
 import { AscensionManager } from './AscensionManager';
 
-const MAX_RELICS = 10;
+// RELIC LIMIT REMOVED
+// const MAX_RELICS = 10;
 
-const RELIC_POOL = [
+export const RARITY_ORDER: ('Bronze' | 'Silver' | 'Gold' | 'Diamond')[] = ['Bronze', 'Silver', 'Gold', 'Diamond'];
+
+export const RELIC_POOL = [
   { name: 'Skibidi Plunger', emoji: '🪠', statType: 'dps_mult', baseValue: 0.10 },
   { name: 'Sigma Stone', emoji: '🪨', statType: 'dps_mult', baseValue: 0.15 },
   { name: 'Ohio Orb', emoji: '🔮', statType: 'gold_mult', baseValue: 0.10 },
@@ -22,7 +25,7 @@ const RELIC_POOL = [
   { name: 'W Stone', emoji: '🪩', statType: 'crit_chance', baseValue: 0.03 },
 ];
 
-const RARITY_MULTIPLIERS: Record<string, number> = {
+export const RARITY_MULTIPLIERS: Record<string, number> = {
   Bronze: 1.0,
   Silver: 1.5,
   Gold: 2.5,
@@ -38,16 +41,65 @@ const RARITY_CHANCES = [
 
 export const RelicManager = {
   tryDropRelic(isBoss: boolean): void {
+    if (GameState.zone < GameState.stats.maxZoneEver) {
+      // RELIC LOCK ACTIVE: No drops until player reaches their Record
+      return;
+    }
+    
     const baseChance = isBoss ? 0.5 : 0.05;
     const chaosBonus = AscensionManager.getTotalBonus('chaos_proc') * 0.5;
     const dropChance = baseChance + chaosBonus;
 
     if (Math.random() > dropChance) return;
-    if (GameState.relics.length >= MAX_RELICS) return;
 
-    const relic = RelicManager.generateRelic();
-    GameState.relics.push(relic);
-    EventBus.emit(Events.RELIC_DROPPED, relic);
+    let targetRelic = RelicManager.generateRelic();
+    EventBus.emit(Events.RELIC_DROPPED, targetRelic);
+    let wasFusedAtLeastOnce = false;
+    
+    // PERSISTENT FUSION LOOP: Keep fusing as long as we have a duplicate of the SAME name and rarity
+    while (true) {
+      const existingIdx = GameState.relics.findIndex(r => r.name === targetRelic.name && r.rarity === targetRelic.rarity);
+      
+      if (existingIdx === -1) {
+        // No more duplicates, stop fusing
+        break;
+      }
+
+      const currentRarityIdx = RARITY_ORDER.indexOf(targetRelic.rarity);
+      if (currentRarityIdx >= RARITY_ORDER.length - 1) {
+        // MAX RARITY (Diamond) reached, now STACK instead of further fusing
+        const existingDiamond = GameState.relics.find(r => r.name === targetRelic.name && r.rarity === 'Diamond');
+        if (existingDiamond) {
+          existingDiamond.count += 1;
+          wasFusedAtLeastOnce = true;
+          EventBus.emit(Events.RELIC_FUSED, existingDiamond);
+          return; // Done
+        }
+        break;
+      }
+
+      // Perform fusion
+      const nextRarity = RARITY_ORDER[currentRarityIdx + 1];
+      
+      // 1. Remove the existing duplicate
+      GameState.relics.splice(existingIdx, 1);
+      
+      // 2. Upgrade our target relic
+      targetRelic.rarity = nextRarity;
+      const base = RELIC_POOL.find(p => p.name === targetRelic.name);
+      if (base) {
+        const mult = RARITY_MULTIPLIERS[nextRarity];
+        targetRelic.statValue = parseFloat((base.baseValue * mult).toFixed(3));
+      }
+
+      wasFusedAtLeastOnce = true;
+      EventBus.emit(Events.RELIC_FUSED, targetRelic);
+      
+      // Continue the loop to check for the next tier
+    }
+
+    // After all possible fusions, add the final relic (No more limit)
+    GameState.relics.push(targetRelic);
   },
 
   generateRelic(): RelicInstance {
@@ -62,6 +114,7 @@ export const RelicManager = {
       statType: base.statType,
       statValue: parseFloat((base.baseValue * mult).toFixed(3)),
       emoji: base.emoji,
+      count: 1,
     };
   },
 
@@ -82,6 +135,6 @@ export const RelicManager = {
   getTotalBonus(statType: string): number {
     return GameState.relics
       .filter(r => r.statType === statType)
-      .reduce((sum, r) => sum + r.statValue, 0);
+      .reduce((sum, r) => sum + (r.statValue * r.count), 0);
   },
 };

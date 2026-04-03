@@ -13,16 +13,16 @@ export const BalanceConfig = {
   GOLD_ZONE_EXPONENT: 1.3,
 
   // Hero
-  HERO_COST_GROWTH: 1.07,
+  HERO_COST_GROWTH: 1.15,
   HERO_MILESTONE_INTERVAL: 25,  // Every 25 levels
-  HERO_MILESTONE_MULTIPLIER: 2, // x2 DPS
+  HERO_MILESTONE_MULTIPLIER: 4, // x4 DPS
 
   // Enemy HP
   BASE_ENEMY_HP: 10,
   ENEMY_HP_GROWTH: 1.55,
 
   // Click damage
-  CLICK_DPS_RATIO: 0.05,    // Click deals 5% of total DPS
+  CLICK_DPS_RATIO: 0.01,    // Click deals 1% of total DPS
   MIN_CLICK_DAMAGE: 1,
 
   // Auto-save interval in ms
@@ -39,12 +39,10 @@ export const BalanceConfig = {
   },
 
   goldPerKill(zone: number, goldMultiplier: Decimal): Decimal {
-    const baseGold = toBigNum(BalanceConfig.BASE_GOLD);
-    // Polynomial part: early game feel
-    const polyPart = Math.pow(zone + 1, BalanceConfig.GOLD_ZONE_EXPONENT);
-    // Exponential part: keeps up with HP growth (1.55^zone) at ~70% of its rate
-    const expPart = Math.pow(1.35, zone / 5);
-    return baseGold.mul(polyPart * expPart).mul(goldMultiplier).floor();
+    // New Exponential Base: 1 multiplied by 1.5 for every zone reached
+    // Zone 1 = 1, Zone 2 = 1.5, Zone 3 = 2.25, etc.
+    const baseGold = toBigNum(1.5).pow(zone - 1);
+    return baseGold.mul(goldMultiplier).floor();
   },
 
   heroCost(baseCost: number, level: number): Decimal {

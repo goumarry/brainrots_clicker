@@ -1,5 +1,6 @@
 export interface SkillDefinition {
   id: string;
+  heroId: string;
   name: string;
   emoji: string;
   description: string;
@@ -7,10 +8,21 @@ export interface SkillDefinition {
   durationSeconds: number; // 0 = instant
   color: number;
 }
-
+ 
 export const SKILL_DATA: SkillDefinition[] = [
   {
+    id: 'aura_de_sigma',
+    heroId: 'nous',
+    name: 'Aura de Sigma',
+    emoji: '🗿',
+    description: 'Click Damage x10 for 20s',
+    cooldownSeconds: 60,
+    durationSeconds: 20,
+    color: 0x95a5a6,
+  },
+  {
     id: 'skibidi_rush',
+    heroId: 'tung_sahur',
     name: 'Skibidi Rush',
     emoji: '🚽',
     description: 'Auto-click x30 for 30s',
@@ -20,6 +32,7 @@ export const SKILL_DATA: SkillDefinition[] = [
   },
   {
     id: 'sigma_grindset',
+    heroId: 'ballerino_lololo',
     name: 'Sigma Grindset',
     emoji: '🐺',
     description: 'DPS x5 for 60s',
@@ -29,6 +42,7 @@ export const SKILL_DATA: SkillDefinition[] = [
   },
   {
     id: 'ohio_mode',
+    heroId: 'bananita_dolfinita',
     name: 'Ohio Mode',
     emoji: '🏴',
     description: 'Random buff x2-x100 for 15s',
@@ -38,15 +52,17 @@ export const SKILL_DATA: SkillDefinition[] = [
   },
   {
     id: 'fanum_tax',
+    heroId: 'bombombini_gusini',
     name: 'Fanum Tax',
     emoji: '💸',
-    description: 'Steal 10% HP from enemy instantly',
+    description: 'Steal 50% HP from enemy instantly',
     cooldownSeconds: 120,
     durationSeconds: 0,
     color: 0x27ae60,
   },
   {
     id: 'rizz_aura',
+    heroId: 'bulbito_bandito',
     name: 'Rizz Aura',
     emoji: '😎',
     description: 'Gold x10 for 45s',
@@ -56,6 +72,7 @@ export const SKILL_DATA: SkillDefinition[] = [
   },
   {
     id: 'gyatt_bomb',
+    heroId: 'cappuccino_assassino',
     name: 'GYATT Bomb',
     emoji: '💣',
     description: 'Nuke for 10 minutes of DPS instantly',
@@ -65,11 +82,52 @@ export const SKILL_DATA: SkillDefinition[] = [
   },
   {
     id: 'mewing_focus',
+    heroId: 'cocofanto_elefanto',
     name: 'Mewing Focus',
     emoji: '🧘',
     description: 'Guaranteed crits for 20s',
     cooldownSeconds: 300,
     durationSeconds: 20,
     color: 0x2980b9,
+  },
+  {
+    id: 'fruit_frenzy',
+    heroId: 'frulli_frulla',
+    name: 'Fruit Frenzy',
+    emoji: '🍎',
+    description: 'Instant gold (1 hour of DPS)',
+    cooldownSeconds: 1200,
+    durationSeconds: 0,
+    color: 0xf1c40f,
+  },
+  {
+    id: 'cosmic_reach',
+    heroId: 'girafa_celestre',
+    name: 'Cosmic Reach',
+    emoji: '🦒',
+    description: 'Crit Multiplier x10 for 15s',
+    cooldownSeconds: 600,
+    durationSeconds: 15,
+    color: 0x34495e,
+  },
+  {
+    id: 'delta_strike',
+    heroId: 'glorbo_fruttodrillo',
+    name: 'Delta Strike',
+    emoji: '🐊',
+    description: 'Nuke for 1 hour of click damage instantly',
+    cooldownSeconds: 600,
+    durationSeconds: 0,
+    color: 0x1abc9c,
+  },
+  {
+    id: 'pineapple_pulse',
+    heroId: 'orangutini_ananasini',
+    name: 'Pineapple Pulse',
+    emoji: '🍍',
+    description: 'Reduce all active cooldowns by 50%',
+    cooldownSeconds: 1800,
+    durationSeconds: 0,
+    color: 0xe67e22,
   },
 ];

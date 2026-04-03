@@ -1,4 +1,5 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { createTextStyle } from '../styles/Typography';
 import { ACHIEVEMENT_DATA } from '../../config/AchievementData';
 import { GameState } from '../../core/GameState';
 import { EventBus, Events } from '../../systems/EventBus';
@@ -25,6 +26,7 @@ export class AchievementScreen {
   private dragStartY: number = 0;
   private dragStartScrollY: number = 0;
   private totalContentH: number = 0;
+  private isDirty: boolean = true;
 
   constructor(width: number, height: number) {
     this.panelW = width;
@@ -33,7 +35,7 @@ export class AchievementScreen {
 
     const bg = new Graphics();
     bg.rect(0, 0, width, height);
-    bg.fill(0x060d16);
+    bg.fill(0x0d1b2a);
     this.container.addChild(bg);
 
     this.scrollContainer = new Container();
@@ -46,8 +48,8 @@ export class AchievementScreen {
     this.scrollContainer.mask = this.maskGraphic;
 
     this.setupScroll();
-    this.build();
-    EventBus.on(Events.ACHIEVEMENT_UNLOCKED, () => this.build());
+
+    EventBus.on(Events.ACHIEVEMENT_UNLOCKED, () => { this.isDirty = true; });
   }
 
   private setupScroll(): void {
@@ -71,15 +73,16 @@ export class AchievementScreen {
     const unlocked = GameState.achievements.length;
     const total = ACHIEVEMENT_DATA.length;
 
-    let yOffset = 10;
+    let yOffset = 16;
     const header = new Text({
       text: `🏆 Achievements (${unlocked}/${total})`,
-      style: { fontSize: 16, fill: 0xffd700, fontWeight: 'bold' }
+      style: createTextStyle({ fontSize: 24, fill: 0xffd700 }),
+      resolution: 3
     });
-    header.x = 16;
+    header.x = 24;
     header.y = yOffset;
     this.scrollContainer.addChild(header);
-    yOffset += 36;
+    yOffset += 50;
 
     const categories = ['kills', 'gold', 'zone', 'heroes', 'clicks', 'skills', 'ascension', 'misc'];
     for (const cat of categories) {
@@ -88,56 +91,64 @@ export class AchievementScreen {
 
       const catLabel = new Text({
         text: `${cat.toUpperCase()} (${catUnlocked}/${catAchs.length})`,
-        style: { fontSize: 12, fill: CATEGORY_COLORS[cat] ?? 0x8899aa, fontWeight: 'bold' }
+        style: createTextStyle({ fontSize: 18, fill: CATEGORY_COLORS[cat] ?? 0x8899aa }),
+        resolution: 3
       });
-      catLabel.x = 16;
+      catLabel.x = 24;
       catLabel.y = yOffset;
       this.scrollContainer.addChild(catLabel);
-      yOffset += 24;
+      yOffset += 32;
 
       for (const ach of catAchs) {
         const isUnlocked = GameState.achievements.includes(ach.id);
         const card = new Graphics();
-        card.roundRect(10, 0, this.panelW - 20, 46, 6);
+        card.roundRect(16, 0, this.panelW - 32, 81, 10);
         card.fill(isUnlocked ? 0x0d2a1a : 0x0a0f18);
-        card.roundRect(10, 0, this.panelW - 20, 46, 6);
-        card.stroke({ width: 1, color: isUnlocked ? CATEGORY_COLORS[cat] : 0x1a2332 });
+        card.roundRect(16, 0, this.panelW - 32, 81, 10);
+        card.stroke({ width: 2, color: isUnlocked ? CATEGORY_COLORS[cat] : 0x1a2332 });
         card.y = yOffset;
         this.scrollContainer.addChild(card);
 
-        const emojiT = new Text({ text: ach.emoji, style: { fontSize: 18 } });
-        emojiT.x = 18;
-        emojiT.y = yOffset + 12;
+        const emojiT = new Text({
+          text: ach.emoji,
+          style: createTextStyle({ fontSize: 24, fontWeight: 'normal' }),
+          resolution: 3
+        });
+        emojiT.x = 28;
+        emojiT.y = yOffset + 24;
         this.scrollContainer.addChild(emojiT);
 
         const nameT = new Text({
           text: ach.name,
-          style: { fontSize: 12, fill: isUnlocked ? 0xffffff : 0x556677, fontWeight: 'bold' }
+          style: createTextStyle({ fontSize: 18, fill: isUnlocked ? 0xffffff : 0x556677 }),
+          resolution: 3
         });
-        nameT.x = 46;
-        nameT.y = yOffset + 6;
+        nameT.x = 64;
+        nameT.y = yOffset + 14;
         this.scrollContainer.addChild(nameT);
 
         const descT = new Text({
           text: isUnlocked ? ach.description : '???',
-          style: { fontSize: 10, fill: 0x667788 }
+          style: createTextStyle({ fontSize: 15, fill: 0x667788 }),
+          resolution: 3
         });
-        descT.x = 46;
-        descT.y = yOffset + 24;
+        descT.x = 64;
+        descT.y = yOffset + 40;
         this.scrollContainer.addChild(descT);
 
         if (isUnlocked) {
           const rewardT = new Text({
             text: `+${Math.round(ach.reward.value * 100)}% ${ach.reward.type.replace('_', ' ')}`,
-            style: { fontSize: 10, fill: 0x44ff88 }
+            style: createTextStyle({ fontSize: 15, fill: 0x44ff88 }),
+            resolution: 3
           });
-          rewardT.anchor.set(1, 0);
-          rewardT.x = this.panelW - 14;
-          rewardT.y = yOffset + 14;
+          rewardT.anchor.set(1, 0.5);
+          rewardT.x = this.panelW - 24;
+          rewardT.y = yOffset + 40;
           this.scrollContainer.addChild(rewardT);
         }
 
-        yOffset += 52;
+        yOffset += 92;
       }
       yOffset += 4;
     }
@@ -145,5 +156,10 @@ export class AchievementScreen {
     this.totalContentH = yOffset + 20;
   }
 
-  update(_deltaSeconds: number): void {}
+  update(_deltaSeconds: number): void {
+    if (this.container.visible && this.isDirty) {
+      this.build();
+      this.isDirty = false;
+    }
+  }
 }

@@ -1,5 +1,7 @@
-import { Application, Container } from 'pixi.js';
+import { Application, Container, Assets } from 'pixi.js';
+import { HERO_DATA } from './config/HeroData';
 import { GameUI } from './ui/GameUI';
+import { registerFonts } from './ui/styles/Typography';
 import { EnemyManager } from './core/EnemyManager';
 import { DamageManager } from './core/DamageManager';
 import { SaveManager } from './core/SaveManager';
@@ -8,7 +10,6 @@ import { GameState } from './core/GameState';
 import { SkillManager } from './core/SkillManager';
 import { OfflineManager } from './core/OfflineManager';
 import { BalanceConfig } from './config/BalanceConfig';
-import { QuestManager } from './core/QuestManager';
 import { AchievementManager } from './core/AchievementManager';
 import { CrazyGamesSDK } from './integrations/CrazyGamesSDK';
 
@@ -17,7 +18,14 @@ export const GAME_H = 720;
 
 async function main(): Promise<void> {
   const app = new Application();
+  
+  // Wait for web fonts to be ready before starting PixiJS
+  await document.fonts.ready;
+  await document.fonts.load('800 1em Outfit');
 
+  // Register custom fonts with PixiJS
+  registerFonts();
+  
   // Init CrazyGames SDK first — must be done before loading/gameplay signals
   await CrazyGamesSDK.init();
 
@@ -31,12 +39,22 @@ async function main(): Promise<void> {
     antialias: true,
     resolution: window.devicePixelRatio || 1,
     autoDensity: true,
+    roundPixels: true,
+    hello: true, // Diagnostics
   });
 
   // Mount canvas
   const container = document.getElementById('game-container');
   if (!container) throw new Error('No game-container element found');
   container.appendChild(app.canvas);
+
+  // Pre-load all Brainrot Assets
+  const assetPaths = HERO_DATA
+    .filter(h => h.image)
+    .map(h => h.image!);
+  
+  // Also pre-load any other specific assets if needed
+  await Assets.load([...assetPaths, 'Outfit']);
 
   // Remove loading text
   const loadingEl = document.getElementById('loading');
@@ -46,18 +64,11 @@ async function main(): Promise<void> {
   CrazyGamesSDK.gameLoadingStop();
   CrazyGamesSDK.gameplayStart();
 
-  // Scale root: all game content lives here at logical 1280x720
-  // PixiJS scales it to fill the actual window → sharp + correct clicks
+  // Liquid Layout: scaleRoot now fills the actual screen
   const scaleRoot = new Container();
   app.stage.addChild(scaleRoot);
 
-  function updateScale(): void {
-    const scaleX = app.screen.width / GAME_W;
-    const scaleY = app.screen.height / GAME_H;
-    scaleRoot.scale.set(scaleX, scaleY);
-  }
-  updateScale();
-  app.renderer.on('resize', updateScale);
+  // Layout is handled in GameUI
 
   // Load saved game or start fresh
   const hasSave = SaveManager.load();
@@ -67,8 +78,7 @@ async function main(): Promise<void> {
     SkillManager.initSkills();
   }
 
-  // Initialize quests and check achievements after load
-  QuestManager.initOrRefresh();
+  // Check achievements after load
   AchievementManager.checkAll();
 
   // Calculate offline progress after loading save

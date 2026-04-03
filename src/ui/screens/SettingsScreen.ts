@@ -1,4 +1,5 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { createTextStyle } from '../styles/Typography';
 import { SaveManager } from '../../core/SaveManager';
 import { EventBus, Events } from '../../systems/EventBus';
 
@@ -19,13 +20,17 @@ export class SettingsScreen {
 
     const bg = new Graphics();
     bg.rect(0, 0, this.panelW, this.panelH);
-    bg.fill(0x060d16);
+    bg.fill(0x0d1b2a);
     this.container.addChild(bg);
 
-    let y = 20;
+    let y = 30;
 
-    const title = new Text({ text: '⚙️ Settings', style: { fontSize: 18, fill: 0xffffff, fontWeight: 'bold' } });
-    title.x = 20;
+    const title = new Text({
+      text: '⚙️ Settings',
+      style: createTextStyle({ fontSize: 20, fill: 0xffffff }),
+      resolution: window.devicePixelRatio || 2,
+    });
+    title.x = 24;
     title.y = y;
     title.eventMode = 'none';
     this.container.addChild(title);
@@ -52,7 +57,8 @@ export class SettingsScreen {
     // Version info
     const version = new Text({
       text: 'BrainrotClicker v1.0\nPhases 1-4 complete',
-      style: { fontSize: 12, fill: 0x556677, align: 'center' }
+      style: createTextStyle({ fontSize: 13, fill: 0x556677, align: 'center', fontWeight: 'normal', padding: 4 }),
+      resolution: window.devicePixelRatio || 2,
     });
     version.anchor.set(0.5, 0);
     version.x = this.panelW / 2;
@@ -62,9 +68,9 @@ export class SettingsScreen {
   }
 
   private addButton(y: number, label: string, color: number, onClick: () => void): number {
-    const btnH = 44;
+    const btnH = 48;
     const btn = new Graphics();
-    btn.roundRect(20, y, this.panelW - 40, btnH, 8);
+    btn.roundRect(24, y, this.panelW - 48, btnH, 8);
     btn.fill(0x0d1926);
     btn.stroke({ color, width: 2 });
     btn.eventMode = 'static';
@@ -72,7 +78,11 @@ export class SettingsScreen {
     btn.on('pointerdown', onClick);
     this.container.addChild(btn);
 
-    const text = new Text({ text: label, style: { fontSize: 14, fill: color, fontWeight: 'bold' } });
+    const text = new Text({
+      text: label,
+      style: createTextStyle({ fontSize: 16, fill: color }),
+      resolution: window.devicePixelRatio || 2,
+    });
     text.anchor.set(0.5);
     text.x = this.panelW / 2;
     text.y = y + btnH / 2;

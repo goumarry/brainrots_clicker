@@ -21,8 +21,6 @@ export const AdManager = {
     CrazyGamesSDK.requestRewardedAd(() => {
       for (const skill of GameState.skills) {
         skill.cooldownRemaining = 0;
-        skill.durationRemaining = 0;
-        skill.isActive = false;
       }
       EventBus.emit(Events.SKILL_READY, -1);
       EventBus.emit(Events.FLOATING_TEXT, '⚡ All cooldowns reset!', 640, 360, 0x44aaff);
@@ -60,5 +58,9 @@ export const AdManager = {
       GameState.doubleGoldExpiry = 0;
       EventBus.emit(Events.GOLD_CHANGED, GameState.gold);
     }
+  },
+
+  getGoldMultiplier(): number {
+    return (GameState.doubleGoldExpiry > 0 && Date.now() < GameState.doubleGoldExpiry) ? 2 : 1;
   },
 };
