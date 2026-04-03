@@ -34,9 +34,6 @@ export class StatsDisplay {
     this.topBar = new Graphics();
     this.topBar.rect(0, 0, width, height);
     this.topBar.fill(0x0d1b2a);
-    // Bottom border line
-    this.topBar.rect(0, height - 1, width, 1);
-    this.topBar.fill(0x1e3a5f);
     this.container.addChild(this.topBar);
 
     const cy = height / 2;

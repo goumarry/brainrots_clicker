@@ -154,11 +154,7 @@ export class GameUI {
     this.statsDisplay.container.x = rightX;
     this.root.addChild(this.statsDisplay.container);
 
-    // Header border
-    const headerBorder = new Graphics();
-    headerBorder.rect(rightX, 0, rw, th);
-    headerBorder.stroke({ color: 0x1e3a5f, width: 1.5 });
-    this.root.addChild(headerBorder);
+    // Header (No border on right side anymore)
 
     // Layout spacing
     const padding = 20;
@@ -198,10 +194,10 @@ export class GameUI {
     });
     this.root.addChild(clickZone);
  
-    // Active Skills HUD (Left side of combat area)
+    // Active Skills HUD (Bottom-Left of combat area, inverted stack)
     this.activeSkillsHUD = new ActiveSkillsDisplay();
     this.activeSkillsHUD.container.x = enemyAreaX + 15;
-    this.activeSkillsHUD.container.y = enemyDisplayY + 70; // Below persistent labels
+    this.activeSkillsHUD.container.y = enemyDisplayY + combatAreaH - 70; // Anchor at BOTTOM-LEFT
     this.root.addChild(this.activeSkillsHUD.container);
  
     // Skill Bar (Bottom Right)
@@ -219,10 +215,7 @@ export class GameUI {
     // CRITICAL: uiOverlay was never added to the stage!
     this.root.addChild(this.uiOverlay);
 
-    const skillBorder = new Graphics();
-    skillBorder.rect(rightX, skillBarY, rw, shh);
-    skillBorder.stroke({ color: 0x1e3a5f, width: 1.5 });
-    this.root.addChild(skillBorder);
+
 
     // FX layers
     const floatingContainer = new Container();
@@ -245,6 +238,19 @@ export class GameUI {
     this.root.addChild(this.relicStatusText);
 
     this.root.addChild(this.uiOverlay);
+ 
+    // GLOBAL DIVIDERS (Top-most layer)
+    const globalDividers = new Graphics();
+    
+    // Horizontal Divider (Bottom of Tabs) - Dark for subtle transition
+    globalDividers.rect(0, th - 2, lw, 2);
+    globalDividers.fill(0x0a1422);
+    
+    // Vertical Divider (Right Border) - Blue, Top-most for un-interrupted line
+    globalDividers.rect(lw - 2, 0, 2, sh);
+    globalDividers.fill(0x1e3a5f);
+    
+    this.root.addChild(globalDividers);
 
     // Tutorial
     if (TutorialOverlay.shouldShow()) {

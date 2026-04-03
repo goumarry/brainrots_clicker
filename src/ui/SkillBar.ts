@@ -1,15 +1,15 @@
-import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Container, Graphics, Text, Sprite } from 'pixi.js';
 import { createTextStyle } from './styles/Typography';
 import { SKILL_DATA } from '../config/SkillData';
 import { SkillManager } from '../core/SkillManager';
 import { GameState } from '../core/GameState';
 import { EventBus, Events } from '../systems/EventBus';
 import { HERO_DATA } from '../config/HeroData';
-import { Sprite, Texture } from 'pixi.js';
 import { StatTooltip } from './StatTooltip';
 
-const SKILL_BTN_SIZE = 80; // Large icons as requested
-const SKILL_BTN_GAP = 2; // Very tight gap for single-row fit
+const SKILL_BTN_BASE_SIZE = 85; 
+const UNIFORM_COLOR = 0x4a9eff;
+const BORDER_THICKNESS = 3;
 
 export class SkillBar {
   container: Container;
@@ -26,272 +26,174 @@ export class SkillBar {
     overlay.addChild(this.tooltip.container);
     this.buildButtons();
 
-    EventBus.on(Events.SKILL_ACTIVATED, (index: unknown) => {
-      this.buttons[index as number]?.refresh();
-    });
-    EventBus.on(Events.SKILL_READY, (index: unknown) => {
-      this.buttons[index as number]?.refresh();
-    });
- 
-    EventBus.on(Events.HERO_BOUGHT, (index: unknown) => {
-      const idx = index as number;
-      const skillIdx = idx % 12;
-      if (skillIdx < this.buttons.length) {
-        this.buttons[skillIdx].refresh();
+    EventBus.on(Events.SKILL_ACTIVATED, (idx: unknown) => { this.buttons[idx as number]?.refresh(); });
+    EventBus.on(Events.SKILL_READY, (idx: unknown) => { this.buttons[idx as number]?.refresh(); });
+    EventBus.on(Events.HERO_BOUGHT, (idx: unknown) => {
+      const sIdx = (idx as number) % 12;
+      if (sIdx < this.buttons.length) {
+        this.buttons[sIdx].refresh();
         this.repositionButtons();
       }
     });
 
     EventBus.on(Events.ASCENSION_COMPLETE, () => {
-      this.buttons.forEach(btn => btn.refresh());
+      this.buttons.forEach(b => b.refresh());
       this.repositionButtons();
     });
   }
 
   private buildButtons(): void {
     for (let i = 0; i < SKILL_DATA.length; i++) {
-      const btn = new SkillButton(i, SKILL_BTN_SIZE, this);
-      this.container.addChild(btn.container);
-      this.buttons.push(btn);
+        const btn = new SkillButton(i, SKILL_BTN_BASE_SIZE, this);
+        this.container.addChild(btn.container);
+        this.buttons.push(btn);
     }
     this.repositionButtons();
   }
 
   public repositionButtons(): void {
     const count = this.buttons.length;
-    let totalButtonsW = 0;
-    for (const btn of this.buttons) {
-      totalButtonsW += btn.width;
-    }
-
-    const totalGapsW = this.barW - totalButtonsW;
-    const gap = totalGapsW / (count + 1); 
- 
-    let currentX = gap;
+    const gap = (this.barW - (count * SKILL_BTN_BASE_SIZE)) / (count + 1);
+    
+    let curX = gap;
     for (let i = 0; i < count; i++) {
-      const btn = this.buttons[i];
-      btn.container.x = currentX;
-      btn.container.y = (this.height - SKILL_BTN_SIZE) / 2;
-      currentX += btn.width + gap;
+        this.buttons[i].container.x = curX;
+        this.buttons[i].container.y = (this.height - SKILL_BTN_BASE_SIZE) / 2 + 10;
+        curX += SKILL_BTN_BASE_SIZE + gap;
     }
   }
- 
-  get overlay(): Container {
-    return this.uiOverlay;
-  }
- 
+
   showTooltip(index: number, x: number, y: number): void {
-    const def = SKILL_DATA[index];
-    const heroDef = HERO_DATA.find(h => h.id === def.heroId);
-    const heroState = GameState.heroes.find(h => h.id === def.heroId);
-    const unlocked = heroState && heroState.level > 0;
- 
-    const globalPos = this.container.toGlobal({ x: x, y: y });
-    const localInOverlay = this.uiOverlay.toLocal(globalPos);
-    const tx = localInOverlay.x;
-    const ty = localInOverlay.y - 15; // Centered exactly above button top, with small gap
- 
+    const glPos = this.container.toGlobal({ x, y });
+    const local = this.uiOverlay.toLocal(glPos);
     const power = GameState.getSkillPower(index);
-    const powerLabel = power > 1 ? ` (Fusion Lvl ${power})` : '';
+    const def = SKILL_DATA[index];
+    const hDef = HERO_DATA.find(h => h.id === def.heroId);
+    const hSt = GameState.heroes.find(h => h.id === def.heroId);
 
-    if (unlocked) {
-      this.tooltip.show({
-        label: def.name + powerLabel,
-        base: def.description,
-        multipliers: [
-          { label: 'Cooldown', value: `${def.cooldownSeconds}s`, type: 'add' },
-          { label: 'Puissance Σ', value: `x${power}`, type: 'mult' }
-        ],
-        total: def.durationSeconds > 0 ? `${def.durationSeconds}s de durée` : 'Effet Instantané'
-      }, tx, ty);
+    if (hSt && hSt.level > 0) {
+        this.tooltip.show({
+            label: def.name + (power > 1 ? ` (Fusion x${power})` : ''),
+            base: def.description,
+            multipliers: [
+                { label: 'Cooldown', value: `${def.cooldownSeconds}s`, type: 'add' },
+                { label: 'Sigma-Power', value: `x${power}`, type: 'mult' }
+            ],
+            total: def.durationSeconds > 0 ? `${def.durationSeconds}s d'effet` : 'Effet Instantané'
+        }, local.x, local.y - 55);
     } else {
-      this.tooltip.show({
-        label: 'VERROUILLÉ',
-        base: `Recrute ${heroDef?.name || '???'} pour débloquer ce sort`,
-        multipliers: [],
-        total: 'Sort indisponible'
-      }, tx, ty);
-    }
-  }
- 
-  hideTooltip(): void {
-    this.tooltip.hide();
-  }
-
-  update(deltaSeconds: number): void {
-    for (const btn of this.buttons) {
-      btn.update(deltaSeconds);
+        this.tooltip.show({ label: 'VERROUILLÉ', base: `Héros ${hDef?.name} requis`, multipliers: [], total: '' }, local.x, local.y - 55);
     }
   }
 
-  get height(): number {
-    return 120;
-  }
+  hideTooltip(): void { this.tooltip.hide(); }
+  update(delta: number): void { this.buttons.forEach(b => b.update(delta)); }
+  get height(): number { return 120; }
 }
 
 class SkillButton {
   container: Container;
   private bg: Graphics;
-  private iconContainer: Container;
-  private parentBar: SkillBar;
+  private content: Container;
   private cooldownOverlay: Graphics;
   private cooldownText: Text;
   private index: number;
-  private size: number; // This is the BASE size (height)
+  private size: number;
   public width: number;
 
-  constructor(index: number, size: number, parentBar: SkillBar) {
+  constructor(index: number, size: number, private parent: SkillBar) {
     this.index = index;
     this.size = size;
     this.width = size;
-    this.parentBar = parentBar;
     this.container = new Container();
     this.container.eventMode = 'static';
     this.container.cursor = 'pointer';
 
-    // Background
     this.bg = new Graphics();
     this.container.addChild(this.bg);
-
-    // Icon Container
-    this.iconContainer = new Container();
-    this.container.addChild(this.iconContainer);
- 
-    // Cooldown overlay (darkened rectangle)
+    this.content = new Container();
+    this.container.addChild(this.content);
     this.cooldownOverlay = new Graphics();
-    this.cooldownOverlay.eventMode = 'none';
     this.container.addChild(this.cooldownOverlay);
- 
-    // Cooldown text
-    this.cooldownText = new Text({
-      text: '',
-      style: createTextStyle({ 
-        fontSize: 13, 
-        fill: 0xffffff, 
-        align: 'center', 
-        padding: 4 
-      }),
-      resolution: 3
-    });
+    this.cooldownText = new Text({ text: '', style: createTextStyle({ fontSize: 13, fontWeight: 'bold' }), resolution: 2 });
     this.cooldownText.anchor.set(0.5);
-    this.cooldownText.eventMode = 'none';
     this.container.addChild(this.cooldownText);
- 
-    // Click handler
-    this.container.on('pointerdown', () => {
-      SkillManager.activateSkill(this.index);
-      this.refresh();
-    });
- 
-    this.container.on('pointerover', () => {
-      this.parentBar.showTooltip(this.index, this.container.x + this.width / 2, this.container.y);
-    });
- 
-    this.container.on('pointerout', () => {
-      this.parentBar.hideTooltip();
-    });
- 
+
+    this.container.on('pointerdown', () => { this.container.scale.set(0.92); SkillManager.activateSkill(this.index); this.refresh(); });
+    this.container.on('pointerup', () => this.container.scale.set(1.0));
+    this.container.on('pointerupoutside', () => this.container.scale.set(1.0));
+    this.container.on('pointerover', () => { this.parent.showTooltip(this.index, this.container.x + this.width / 2, this.container.y); });
+    this.container.on('pointerout', () => { this.parent.hideTooltip(); });
+
     this.refresh();
   }
 
-  private drawBg(isActive: boolean): void {
-    const def = SKILL_DATA[this.index];
-    this.bg.clear();
-    this.bg.roundRect(0, 0, this.width, this.size, 8);
-    this.bg.fill(0x1a2332);
-    this.bg.roundRect(0, 0, this.width, this.size, 8);
-    this.bg.stroke({ width: 4, color: def.color });
-  }
-
   refresh(): void {
-    const def = SKILL_DATA[this.index];
-    const skill = GameState.skills[this.index];
-    if (!skill) return;
- 
-    const heroState = GameState.heroes.find(h => h.id === def.heroId);
-    const isUnlocked = heroState && heroState.level > 0;
+    const s = GameState.skills[this.index];
+    const hSt = GameState.heroes[this.index];
     const power = GameState.getSkillPower(this.index);
+    const isU = hSt && hSt.level > 0;
+    const isActive = s && s.isActive;
 
-    // UPDATE WIDTH based on fusion level (+10px on each side = +20 total)
-    this.width = power > 1 ? this.size + 20 : this.size;
- 
-    this.container.eventMode = isUnlocked ? 'static' : 'none';
-    this.container.cursor = isUnlocked ? 'pointer' : 'default';
-    this.container.alpha = isUnlocked ? 1.0 : 0.5;
- 
-    this.drawBg(!!(skill.isActive && isUnlocked));
-    this.updateIcon(!!isUnlocked);
-    this.updateCooldownOverlay();
+    this.width = SKILL_BTN_BASE_SIZE;
+    this.container.alpha = isU ? 1.0 : 0.6;
+    this.container.eventMode = isU ? 'static' : 'none';
 
-    // Re-center cooldown text
-    this.cooldownText.x = this.width / 2;
-    this.cooldownText.y = this.size / 2;
-  }
- 
-  private updateIcon(unlocked: boolean): void {
-    this.iconContainer.removeChildren();
-    
-    if (unlocked) {
-      const power = GameState.getSkillPower(this.index);
-      const totalWidth = this.width * 0.9;
-      const iconSize = power > 1 ? (totalWidth / power) * 1.1 : totalWidth; // Slightly larger icons in wide buttons
-      const startX = (this.width - (iconSize * power)) / 2 + iconSize / 2;
+    // 1. UNIFORM BACKGROUND & BORDER
+    this.bg.clear().roundRect(0, 0, this.width, this.size, 10).fill(0x0d141e);
+    // FIXED 3PX BORDER
+    this.bg.stroke({ width: BORDER_THICKNESS, color: isU ? UNIFORM_COLOR : 0x444444, alpha: (isActive || isU) ? 1.0 : 0.7 });
 
-      for (let p = 0; p < power; p++) {
-        const heroIdx = this.index + (p * 12);
-        if (heroIdx >= HERO_DATA.length) break;
-        
-        const hDef = HERO_DATA[heroIdx];
-        if (hDef.image) {
-          const sprite = Sprite.from(hDef.image);
-          sprite.width = Math.min(iconSize, this.size * 0.9); 
-          sprite.height = this.size * 0.8;
-          sprite.anchor.set(0.5);
-          
-          sprite.x = startX + p * (iconSize * 0.9);
-          sprite.y = this.size / 2;
-          sprite.alpha = 1.0; 
-          
-          this.iconContainer.addChild(sprite);
-        } else {
-          const txt = new Text({
-            text: hDef.emoji,
-            style: createTextStyle({ fontSize: iconSize * 0.6, align: 'center' }),
-          });
-          txt.anchor.set(0.5);
-          txt.x = startX + p * iconSize;
-          txt.y = this.size / 2;
-          this.iconContainer.addChild(txt);
+    // 2. ICONS (STILL OVERLAPPING/OVERFLOWING ON SIDES)
+    this.content.removeChildren();
+    if (isU) {
+        const pSize = 85; const overlap = 30; 
+        const totalIconsW = pSize + (power - 1) * (pSize - overlap);
+        const startX = (this.width - totalIconsW) / 2 + pSize/2;
+
+        for (let p = 0; p < power; p++) {
+            const h = HERO_DATA[this.index + (p * 12)];
+            if (!h) break;
+            const sprC = new Container();
+            sprC.x = startX + p * (pSize - overlap); 
+            sprC.y = (this.size / 2) - 10;
+            if (h.image) {
+                const s = Sprite.from(h.image); s.width = s.height = pSize * 1.1; s.anchor.set(0.5);
+                sprC.addChild(s);
+            } else {
+                const e = new Text({ text: h.emoji, style: { fontSize: 48 } }); e.anchor.set(0.5);
+                sprC.addChild(e);
+            }
+            this.content.addChild(sprC);
         }
-      }
     } else {
-      const lock = new Text({
-        text: '🔒',
-        style: createTextStyle({ fontSize: this.size * 0.4, align: 'center' }),
-      });
-      lock.anchor.set(0.5);
-      lock.x = this.width / 2;
-      lock.y = this.size / 2;
-      this.iconContainer.addChild(lock);
+        const lock = new Text({ text: '🔒', style: createTextStyle({ fontSize: 24 }) });
+        lock.anchor.set(0.5); lock.x = this.width / 2; lock.y = this.size / 2;
+        this.content.addChild(lock);
     }
+    this.cooldownText.x = this.width / 2; this.cooldownText.y = this.size / 2;
   }
 
-  private updateCooldownOverlay(): void {
-    const skill = GameState.skills[this.index];
+  update(_d: number): void {
+    const s = GameState.skills[this.index];
+    const def = SKILL_DATA[this.index];
+    if (!s) return;
+
     this.cooldownOverlay.clear();
+    if (s.cooldownRemaining > 0) {
+        const ratio = s.cooldownRemaining / def.cooldownSeconds;
+        const fillH = this.size * ratio;
+        
+        // SINGLE DARK FILTER: Drains from top to bottom
+        this.cooldownOverlay.roundRect(0, this.size - fillH, this.width, fillH, 8).fill({ color: 0x000000, alpha: 0.6 });
 
-    if (skill && skill.cooldownRemaining > 0) {
-      this.cooldownOverlay.roundRect(0, 0, this.width, this.size, 8);
-      this.cooldownOverlay.fill({ color: 0x000000, alpha: 0.65 });
-      const secs = Math.ceil(skill.cooldownRemaining);
-      this.cooldownText.text = secs >= 60 ? `${Math.ceil(secs / 60)}m` : `${secs}s`;
-    } else {
-      this.cooldownText.text = '';
+        this.cooldownText.text = s.cooldownRemaining >= 60 ? `${Math.ceil(s.cooldownRemaining / 60)}m` : `${Math.ceil(s.cooldownRemaining)}s`;
+        this.cooldownText.style.fill = 0xffffff;
+        this.cooldownText.visible = true; 
+        this.content.alpha = 0.5; // Dimmed until cleared
+    } else { 
+        this.cooldownText.visible = false; 
+        this.content.alpha = 1.0; 
     }
-  }
-
-  update(_deltaSeconds: number): void {
-    this.updateCooldownOverlay();
   }
 }
-

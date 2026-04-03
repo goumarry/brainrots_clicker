@@ -31,11 +31,10 @@ export class EnemyDisplay {
     this.areaH = height;
     this.container = new Container();
 
-    // Background for the rectangular combat zone (Matches full area)
+    // Background for the rectangular combat zone (Grass color)
     const mainBg = new Graphics();
     mainBg.roundRect(0, 0, width, height, 15);
-    mainBg.fill({ color: 0x0a1422, alpha: 0.6 });
-    mainBg.stroke({ color: 0x1e3a5f, width: 2 });
+    mainBg.fill(0x3a5a40); // Lush Grass Green
     this.container.addChild(mainBg);
 
     // Enemy Sprite/Emoji Container (Centered)

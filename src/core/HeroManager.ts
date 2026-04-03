@@ -22,11 +22,13 @@ export const HeroManager = {
     return BalanceConfig.heroDPS(hero.baseDPS, state.level, milestoneBonus);
   },
 
-
   getTotalDPS(): Decimal {
     let total = new Decimal(0);
     for (let i = 0; i < HERO_DATA.length; i++) {
-      total = total.add(HeroManager.getHeroDPS(i));
+        const h = GameState.heroes[i];
+        if (h.level > 0) {
+            total = total.add(HeroManager.getHeroDPS(i));
+        }
     }
     const ascMult = AscensionManager.getDPSAscensionMult();
     const achMult = 1 + AchievementManager.getTotalRewardMult('dps_mult');
@@ -39,22 +41,19 @@ export const HeroManager = {
     if (!GoldManager.canAfford(cost)) return false;
 
     GoldManager.spendGold(cost);
-    if (!GameState.heroes[heroIndex].isUnlocked) return false;
+    const state = GameState.heroes[heroIndex];
+    if (!state.isUnlocked) return false;
 
-    GameState.heroes[heroIndex].level += 1;
-
-    if (GameState.heroes[heroIndex].level === 1) {
+    state.level += 1;
+    if (state.level === 1) {
       GameState.stats.herosBought += 1;
     }
 
-    const rawDPS = HeroManager.getTotalDPS();
-    const effectiveDPS = rawDPS.mul(GameState.dpsMultiplier);
-    GameState.totalDPS = effectiveDPS;
+    // UPDATED: Recalculate DPS but REMOVED AchievementManager.checkAll() from hot path
+    // Achievements are checked periodically in GameUI.ts every 0.1s
+    this.recalculateDPS();
 
-    AchievementManager.checkAll();
-
-    EventBus.emit(Events.HERO_BOUGHT, heroIndex, GameState.heroes[heroIndex].level);
-    EventBus.emit(Events.DPS_CHANGED, effectiveDPS);
+    EventBus.emit(Events.HERO_BOUGHT, heroIndex, state.level);
     return true;
   },
 
@@ -70,8 +69,7 @@ export const HeroManager = {
     if (GameState.heroes[heroIndex].isUnlocked) return;
 
     GameState.heroes[heroIndex].isUnlocked = true;
-    EventBus.emit(Events.HERO_BOUGHT, heroIndex, 0); // reusing event to refresh UI
-    // In a future pass we can add a specific Event for unlocking if needed
+    EventBus.emit(Events.HERO_BOUGHT, heroIndex, 0); 
   },
 
   getMilestoneLevel(heroIndex: number): number {
@@ -90,11 +88,10 @@ export const HeroManager = {
     for (const h of GameState.heroes) {
       totalLevels += h.level;
     }
-    // Every 5 levels = 10% cumulative bonus (multiplicative)
     return Math.pow(1.1, Math.floor(totalLevels / 5));
   },
 };
 
-// Auto-recalculate stats on major events
+// Periodic checks handled in UI loop
 EventBus.on(Events.RELIC_DROPPED, () => { HeroManager.recalculateDPS(); });
 EventBus.on(Events.ACHIEVEMENT_UNLOCKED, () => { HeroManager.recalculateDPS(); });
