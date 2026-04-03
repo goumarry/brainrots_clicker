@@ -53,13 +53,14 @@ export class SkillBar {
 
   public repositionButtons(): void {
     const count = this.buttons.length;
-    const gap = (this.barW - (count * SKILL_BTN_BASE_SIZE)) / (count + 1);
+    const btnSizeWithMargin = SKILL_BTN_BASE_SIZE + 4; // 2px each side
+    const gap = (this.barW - (count * btnSizeWithMargin)) / (count + 1);
     
-    let curX = gap;
+    let curX = gap + 2; 
     for (let i = 0; i < count; i++) {
         this.buttons[i].container.x = curX;
         this.buttons[i].container.y = (this.height - SKILL_BTN_BASE_SIZE) / 2 + 10;
-        curX += SKILL_BTN_BASE_SIZE + gap;
+        curX += btnSizeWithMargin + gap;
     }
   }
 
@@ -100,6 +101,7 @@ class SkillButton {
   private index: number;
   private size: number;
   public width: number;
+  private pulseTimer: number = 0;
 
   constructor(index: number, size: number, private parent: SkillBar) {
     this.index = index;
@@ -139,10 +141,13 @@ class SkillButton {
     this.container.alpha = isU ? 1.0 : 0.6;
     this.container.eventMode = isU ? 'static' : 'none';
 
-    // 1. UNIFORM BACKGROUND & BORDER
-    this.bg.clear().roundRect(0, 0, this.width, this.size, 10).fill(0x0d141e);
-    // FIXED 3PX BORDER
-    this.bg.stroke({ width: BORDER_THICKNESS, color: isU ? UNIFORM_COLOR : 0x444444, alpha: (isActive || isU) ? 1.0 : 0.7 });
+    // 1. DISTINCT SLATE BACKGROUND (2px larger on each side)
+    const margin = 2;
+    this.bg.clear()
+        .roundRect(-margin, -margin, this.width + margin * 2, this.size + margin * 2, 12)
+        .fill({ color: 0x2d3748, alpha: 0.95 });
+    
+    // No borders as per previous request
 
     // 2. ICONS (STILL OVERLAPPING/OVERFLOWING ON SIDES)
     this.content.removeChildren();
@@ -174,23 +179,34 @@ class SkillButton {
     this.cooldownText.x = this.width / 2; this.cooldownText.y = this.size / 2;
   }
 
-  update(_d: number): void {
+  update(delta: number): void {
     const s = GameState.skills[this.index];
     const def = SKILL_DATA[this.index];
-    if (!s) return;
+    const hSt = GameState.heroes[this.index];
+    const isU = hSt && hSt.level > 0;
+    if (!s || !isU) return;
+
+    this.pulseTimer += delta;
+    const isActive = s.isActive && s.durationRemaining > 0;
+    const isReady = s.cooldownRemaining <= 0 && !isActive;
+
+    // DRAW BACKGROUND ONLY
+    const margin = 2;
+    this.bg.clear();
+    this.bg.roundRect(-margin, -margin, this.width + margin * 2, this.size + margin * 2, 12)
+        .fill({ color: isActive ? 0x4a5568 : 0x2d3748, alpha: 0.95 });
 
     this.cooldownOverlay.clear();
     if (s.cooldownRemaining > 0) {
         const ratio = s.cooldownRemaining / def.cooldownSeconds;
-        const fillH = this.size * ratio;
-        
-        // SINGLE DARK FILTER: Drains from top to bottom
-        this.cooldownOverlay.roundRect(0, this.size - fillH, this.width, fillH, 8).fill({ color: 0x000000, alpha: 0.6 });
+        const margin = 2;
+        const fillH = (this.size + margin * 2) * ratio;
+        this.cooldownOverlay.roundRect(-margin, (this.size + margin) - fillH, this.width + margin * 2, fillH, 12).fill({ color: 0x000000, alpha: 0.65 });
 
         this.cooldownText.text = s.cooldownRemaining >= 60 ? `${Math.ceil(s.cooldownRemaining / 60)}m` : `${Math.ceil(s.cooldownRemaining)}s`;
         this.cooldownText.style.fill = 0xffffff;
         this.cooldownText.visible = true; 
-        this.content.alpha = 0.5; // Dimmed until cleared
+        this.content.alpha = 0.5;
     } else { 
         this.cooldownText.visible = false; 
         this.content.alpha = 1.0; 

@@ -11,7 +11,7 @@ export interface HeroDefinition {
 }
 
 export const HERO_DATA: HeroDefinition[] = [
-  { id: 'nous', name: 'Nous', emoji: '👤', baseCost: 10, baseDPS: 0, description: "C'est nous ! Chaque niveau augmente les dégâts de base de clic de +1.", rarity: 'Common', unlockZone: 0 },
+  { id: 'nous', name: 'Gigachad', emoji: '👤', image: 'assets/brainrots/Portrait.gigachad.webp', baseCost: 5, baseDPS: 0, description: "C'est nous ! Chaque niveau augmente les dégâts de base de clic de +1.", rarity: 'Common', unlockZone: 0 },
   { id: 'tung_sahur', name: 'Tung Tung Sahur', emoji: '🥁', image: 'assets/brainrots/Tung-Tung-Tung-Sahur-PNG.png', baseCost: 10, baseDPS: 1000000000000000000000000, description: 'The beat maker. Let the rhythm guide your clicks.', rarity: 'Common', unlockZone: 1 },
   { id: 'ballerino_lololo', name: 'Ballerino Lololo', emoji: '🩰', image: 'assets/brainrots/Ballerino-Lololo-PNG.png', baseCost: 1000, baseDPS: 140, description: 'Dancing warrior.', rarity: 'Common', unlockZone: 10 },
   { id: 'bananita_dolfinita', name: 'Bananita Dolfinita', emoji: '🐬', image: 'assets/brainrots/Bananita-Dolfinita-PNG.png', baseCost: 10000, baseDPS: 1800, description: 'Fruit aquatic master.', rarity: 'Rare', unlockZone: 20 },

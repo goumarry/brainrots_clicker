@@ -6,7 +6,7 @@ import { GameState } from '../core/GameState';
 import { EventBus, Events } from '../systems/EventBus';
 import { HERO_DATA } from '../config/HeroData';
 
-const CARD_HEIGHT = 160; // Reduced ~15% (from 190)
+const CARD_HEIGHT = 160; 
 const PADDING = 10;
 const BTN_WIDTH = 140;
 const BTN_HEIGHT = 48; 
@@ -21,7 +21,6 @@ interface HeroCard {
   buyBtn: Graphics;
   actionGroup: Container; 
   iconContainer: Container;
-  lastAfford: boolean;
   isPressed: boolean; 
 }
 
@@ -34,6 +33,7 @@ export class HeroPanel {
   private scrollY: number = 0;
   private maxScroll: number = 0;
   private hoverIdx: number = -1;
+  private pulseTimer: number = 0;
 
   constructor(width: number, height: number) {
     this.panelW = width;
@@ -45,8 +45,7 @@ export class HeroPanel {
     this.container.addChild(this.scrollContainer);
 
     const mask = new Graphics();
-    mask.rect(0, 0, width, height);
-    mask.fill(0xffffff); 
+    mask.rect(0, 0, width, height).fill(0xffffff); 
     this.container.addChild(mask);
     this.scrollContainer.mask = mask;
 
@@ -89,8 +88,7 @@ export class HeroPanel {
         
         const sc = new Container();
         const m = new Graphics();
-        m.roundRect(0, 0, this.panelW - PADDING * 2, CARD_HEIGHT, 12);
-        m.fill(0xffffff);
+        m.roundRect(0, 0, this.panelW - PADDING * 2, CARD_HEIGHT, 12).fill(0xffffff);
         sc.mask = m;
         cardCont.addChild(m);
         cardCont.addChild(sc);
@@ -141,7 +139,7 @@ export class HeroPanel {
         this.cards.push({ 
             container: cardCont, bg: cardBg, nameText: nT, levelText: lT, dpsText: dT, 
             costText: cT, buyBtn, actionGroup, iconContainer: sc,
-            lastAfford: false, isPressed: false
+            isPressed: false
         });
         this.updateCard(i);
     }
@@ -166,12 +164,19 @@ export class HeroPanel {
         const sWidth = (card.isPressed || isHovered) ? 2 : 1.5;
         card.bg.stroke({ color: sColor, width: sWidth, alpha: isHovered ? 1.0 : 0.8 });
     } else if (isNext) {
-        card.bg.fill(0x0c121a); 
-        if (card.isPressed || isHovered) {
-          card.bg.stroke({ color: 0x1e3a5f, width: 2.5 });
-        }
+        card.bg.fill(0x0c131d); 
+        // Pulsing border for NEXT hero is handled in updatePulse()
     } else {
         card.bg.fill(0x02050a);
+        
+        // Add diagonal stripes pattern to locked cards
+        const stripeSpacing = 20;
+        const cardW = this.panelW - 20;
+        for (let x = -CARD_HEIGHT; x < cardW; x += stripeSpacing) {
+            card.bg.moveTo(x, 0);
+            card.bg.lineTo(x + CARD_HEIGHT, CARD_HEIGHT);
+            card.bg.stroke({ color: 0xffffff, width: 1, alpha: 0.03 });
+        }
     }
 
     const bgC = card.iconContainer;
@@ -180,14 +185,17 @@ export class HeroPanel {
         (sprOrTxt as any).anchor?.set(0.5); (sprOrTxt as any).x = this.panelW - 130; 
         (sprOrTxt as any).y = CARD_HEIGHT / 2;
         (sprOrTxt as any).rotation = -Math.PI / 2; (sprOrTxt as any).alpha = hero.image ? 0.20 : 0.10;
-        if(hero.image) (sprOrTxt as Sprite).scale.set(0.6); // Reduced further for maximum clarity
+        if(hero.image) (sprOrTxt as Sprite).scale.set(0.6); 
         bgC.addChild(sprOrTxt);
     }
-    bgC.children[0].visible = isUnlocked || isNext;
-    bgC.children[0].alpha = isNext ? 0.05 : (hero.image ? 0.20 : 0.10);
+    bgC.children[0].visible = true; // Always show silhouette for discovery
+    bgC.children[0].alpha = isUnlocked ? (hero.image ? 0.20 : 0.10) : (isNext ? 0.06 : 0.03);
+    if (!isUnlocked) (bgC.children[0] as any).tint = 0x000000; // Silhouette effect
+    else (bgC.children[0] as any).tint = 0xffffff;
 
-    card.nameText.text = isUnlocked ? hero.name : `(Zone ${hero.unlockZone})`;
-    card.nameText.style.fill = isUnlocked ? 0xffffff : (isNext ? 0x7fbfff : 0x4a5a6a);
+    card.nameText.text = isUnlocked ? hero.name : `REQUIS : ZONE ${hero.unlockZone} 🔒`;
+    card.nameText.style.fill = isUnlocked ? 0xffffff : (isNext ? 0x4a9eff : 0x2c3e50);
+    card.nameText.style.fontSize = isUnlocked ? 24 : 16;
 
     if (isUnlocked) {
         card.levelText.visible = true; card.levelText.text = `LVL ${state.level}`;
@@ -198,20 +206,26 @@ export class HeroPanel {
     } else { card.levelText.visible = false; card.dpsText.visible = false; }
 
     card.actionGroup.visible = isUnlocked;
-    if (isUnlocked) card.costText.text = `${formatGold(HeroManager.getHeroCost(i))}💰`;
+    if (isUnlocked) {
+        card.costText.text = `${formatGold(HeroManager.getHeroCost(i))}💰`;
+        this.updateButtonGraphics(i);
+    }
+  }
+
+  private updateButtonGraphics(i: number): void {
+    const card = this.cards[i];
+    const canAfford = GameState.gold.gte(HeroManager.getHeroCost(i));
+    card.buyBtn.clear().roundRect(0, 0, BTN_WIDTH, BTN_HEIGHT, 12);
+    card.buyBtn.fill(canAfford ? 0x2d5a27 : 0x2a3544);
+    if (canAfford) card.buyBtn.stroke({ color: 0x44ff88, width: 2, alpha: 0.8 });
+    else card.buyBtn.stroke({ color: 0xffffff, width: 1, alpha: 0.2 });
   }
 
   private updateButtons(): void {
     for (let i = 0; i < this.cards.length; i++) {
         const card = this.cards[i];
-        if (!card.actionGroup.visible) continue;
-        const canAfford = GameState.gold.gte(HeroManager.getHeroCost(i));
-        if (canAfford !== card.lastAfford) {
-            card.buyBtn.clear().roundRect(0, 0, BTN_WIDTH, BTN_HEIGHT, 12);
-            card.buyBtn.fill(canAfford ? 0x2d5a27 : 0x334455);
-            if (canAfford) card.buyBtn.stroke({ color: 0x44ff88, width: 2, alpha: 0.7 });
-            else card.buyBtn.stroke({ color: 0xffffff, width: 1, alpha: 0.1 });
-            card.lastAfford = canAfford;
+        if (card.actionGroup.visible) {
+            this.updateButtonGraphics(i);
         }
     }
   }
@@ -230,5 +244,27 @@ export class HeroPanel {
   private clampScroll(): void {
     this.scrollY = Math.min(0, Math.max(this.scrollY, -this.maxScroll));
     this.scrollContainer.y = Math.floor(this.scrollY);
+  }
+
+  public update(delta: number): void {
+    this.pulseTimer += delta;
+    this.updatePulse();
+  }
+
+  private updatePulse(): void {
+    const nextIdx = GameState.heroes.findIndex(h => !h.isUnlocked);
+    if (nextIdx === -1 || nextIdx >= this.cards.length) return;
+
+    const card = this.cards[nextIdx];
+    const isHovered = this.hoverIdx === nextIdx;
+    
+    // Only redraw the pulse border for the ONE "Next" card
+    const pulse = (Math.sin(this.pulseTimer * 4) + 1) / 2; // 0 to 1
+    const color = isHovered ? 0x4a9eff : 0x1e3a5f;
+    const alpha = 0.3 + pulse * 0.7;
+
+    card.bg.clear();
+    card.bg.roundRect(0, 0, this.panelW - 20, CARD_HEIGHT, 12).fill(isHovered ? 0x121c2b : 0x0c131d);
+    card.bg.stroke({ color: color, width: 2.5, alpha: alpha });
   }
 }

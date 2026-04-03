@@ -175,6 +175,7 @@ export class GameUI {
     const enemyDisplayY = th + padding;
  
     // Enemy Display
+    if (this.enemyDisplay) this.enemyDisplay.destroy();
     this.enemyDisplay = new EnemyDisplay(enemyAreaW, combatAreaH);
     this.enemyDisplay.setBasePosition(enemyAreaX, enemyDisplayY);
     this.root.addChild(this.enemyDisplay.container);
@@ -399,8 +400,10 @@ export class GameUI {
     }
 
     this.skillBar.update(deltaSeconds);
+    this.heroPanel.update(deltaSeconds);
     this.particleSystem.update(deltaSeconds);
-    AdManager.tick();
+    AdManager.tick(deltaSeconds);
+    this.adRewardsPanel.update(deltaSeconds);
  
     // Update relic status
     const isActive = GameState.zone >= GameState.stats.maxZoneEver;

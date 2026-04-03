@@ -50,18 +50,21 @@ class ActiveSkillItem {
   private timerText: Text;
   private iconContainer: Container;
   private maxDuration: number = 0;
+  private pulseTimer: number = 0;
+  private skillIndex: number;
 
   constructor(skillIndex: number) {
+    this.skillIndex = skillIndex;
     this.container = new Container();
     const def = SKILL_DATA[skillIndex];
     const power = GameState.getSkillPower(skillIndex);
 
-    // 1. BACKGROUND & UNIFORM BORDER (2px Neon Blue)
+    // 1. BACKGROUND & PREMIUM GLASSMISM
     this.bg = new Graphics();
-    this.bg.roundRect(0, 0, HUD_ITEM_SIZE, HUD_ITEM_SIZE, 10);
-    this.bg.fill({ color: 0x000000, alpha: 0.75 });
-    this.bg.stroke({ color: UNIFORM_COLOR, width: BORDER_THICKNESS });
     this.container.addChild(this.bg);
+    
+    // Initial draw
+    this.drawPremiumBorder(1);
 
     // 2. RELIEF ICONS (Overflow like SkillBar)
     this.iconContainer = new Container();
@@ -110,23 +113,33 @@ class ActiveSkillItem {
     this.maxDuration = def?.durationSeconds || 1;
   }
 
-  update(durationRemaining: number, _deltaSeconds: number): void {
+  update(durationRemaining: number, deltaSeconds: number): void {
+    this.pulseTimer += deltaSeconds;
     this.timerText.text = `${durationRemaining.toFixed(1)}s`;
     
-    const barW = 90; // Slightly wider for 54px box
-    const barH = 3;  // Even sleeker neon line
+    // Update Pulsing Neon Border
+    this.drawPremiumBorder(durationRemaining);
+
+    const barW = 90;
+    const barH = 3;  
     const ratio = Math.max(0, Math.min(1, durationRemaining / this.maxDuration));
     
     this.bar.clear();
     // Shadow
-    this.bar.roundRect(HUD_ITEM_SIZE + 16, 34, barW, barH, 2);
-    this.bar.fill({ color: 0x000000, alpha: 0.5 });
+    this.bar.roundRect(HUD_ITEM_SIZE + 16, 34, barW, barH, 2).fill({ color: 0x000000, alpha: 0.5 });
+    
     // Neon Progress
     if (ratio > 0) {
-      this.bar.roundRect(HUD_ITEM_SIZE + 16, 34, barW * ratio, barH, 2);
-      this.bar.fill(UNIFORM_COLOR);
+      const color = ratio > 0.3 ? UNIFORM_COLOR : 0xff4444; // Warning color at low time
+      this.bar.roundRect(HUD_ITEM_SIZE + 16, 34, barW * ratio, barH, 2).fill(color);
       this.bar.stroke({ color: 0xffffff, width: 1, alpha: 0.3 });
     }
+  }
+
+  private drawPremiumBorder(durationRemaining: number): void {
+    this.bg.clear();
+    // Glassmorphism bg (No border)
+    this.bg.roundRect(0, 0, HUD_ITEM_SIZE, HUD_ITEM_SIZE, 12).fill({ color: 0x0a1018, alpha: 0.85 });
   }
 
   destroy(): void {

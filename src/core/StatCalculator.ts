@@ -39,6 +39,11 @@ export const StatCalculator = {
 
     const currentDpsMult = GameState.dpsMultiplier.toNumber();
     if (currentDpsMult > 1) breakdown.multipliers.push({ label: 'Bonus Temporaire', value: currentDpsMult, type: 'mult' });
+    
+    // Ad DPS Boost
+    if (GameState.dpsBoostTimeLeft > 0) {
+        breakdown.multipliers.push({ label: 'Pub Double DPS', value: 2.0, type: 'mult' });
+    }
 
     return breakdown;
   },

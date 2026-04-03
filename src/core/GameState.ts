@@ -71,6 +71,8 @@ export interface GameStateData {
   achievements?: string[];
   stats?: PlayerStats;
   doubleGoldExpiry?: number;
+  goldBoostTimeLeft?: number;
+  dpsBoostTimeLeft?: number;
   highestZoneAscended?: number;
 }
 
@@ -130,7 +132,9 @@ class GameStateClass {
   achievements: string[] = [];
 
   // Phase 4: Ad reward tracking
-  doubleGoldExpiry: number = 0;
+  doubleGoldExpiry: number = 0; // Legacy
+  goldBoostTimeLeft: number = 0;
+  dpsBoostTimeLeft: number = 0;
 
   // Phase 3: Player stats
   stats: PlayerStats = {
@@ -170,6 +174,8 @@ class GameStateClass {
       achievements: [...this.achievements],
       stats: { ...this.stats, skillsUsedById: [...this.stats.skillsUsedById] },
       doubleGoldExpiry: this.doubleGoldExpiry,
+      goldBoostTimeLeft: this.goldBoostTimeLeft,
+      dpsBoostTimeLeft: this.dpsBoostTimeLeft,
       highestZoneAscended: this.highestZoneAscended,
     };
   }
@@ -206,6 +212,8 @@ class GameStateClass {
     this.sigmaSouls = data.sigmaSouls ?? 0;
     this.relics = (data.relics || []).map(r => ({ ...r, count: r.count || 1 }));
     this.doubleGoldExpiry = data.doubleGoldExpiry ?? 0;
+    this.goldBoostTimeLeft = data.goldBoostTimeLeft ?? 0;
+    this.dpsBoostTimeLeft = data.dpsBoostTimeLeft ?? 0;
     this.highestZoneAscended = (data as any).highestZoneAscended ?? 0;
     this.stats = {
       totalKills: 0,
