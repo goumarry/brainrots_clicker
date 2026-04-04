@@ -73,6 +73,8 @@ export interface GameStateData {
   doubleGoldExpiry?: number;
   goldBoostTimeLeft?: number;
   dpsBoostTimeLeft?: number;
+  relicBoostCooldown?: number;
+  heroBoostCooldown?: number;
   highestZoneAscended?: number;
 }
 
@@ -135,6 +137,8 @@ class GameStateClass {
   doubleGoldExpiry: number = 0; // Legacy
   goldBoostTimeLeft: number = 0;
   dpsBoostTimeLeft: number = 0;
+  relicBoostCooldown: number = 0;
+  heroBoostCooldown: number = 0;
 
   // Phase 3: Player stats
   stats: PlayerStats = {
@@ -176,6 +180,8 @@ class GameStateClass {
       doubleGoldExpiry: this.doubleGoldExpiry,
       goldBoostTimeLeft: this.goldBoostTimeLeft,
       dpsBoostTimeLeft: this.dpsBoostTimeLeft,
+      relicBoostCooldown: this.relicBoostCooldown,
+      heroBoostCooldown: this.heroBoostCooldown,
       highestZoneAscended: this.highestZoneAscended,
     };
   }
@@ -214,6 +220,8 @@ class GameStateClass {
     this.doubleGoldExpiry = data.doubleGoldExpiry ?? 0;
     this.goldBoostTimeLeft = data.goldBoostTimeLeft ?? 0;
     this.dpsBoostTimeLeft = data.dpsBoostTimeLeft ?? 0;
+    this.relicBoostCooldown = data.relicBoostCooldown ?? 0;
+    this.heroBoostCooldown = data.heroBoostCooldown ?? 0;
     this.highestZoneAscended = (data as any).highestZoneAscended ?? 0;
     this.stats = {
       totalKills: 0,

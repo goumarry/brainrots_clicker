@@ -6,15 +6,20 @@ import { AchievementManager } from './AchievementManager';
 
 export const ZoneManager = {
   advanceZone(): void {
-    if (GameState.zone >= BalanceConfig.MAX_ZONES) {
-      // Already at max zone, just respawn
+    if (GameState.zone > BalanceConfig.MAX_ZONES) {
+      // Already at max completion zone, just stay here
       GameState.enemyKillCount = 0;
-      EnemyManager.spawnNextNormal();
       return;
     }
 
     GameState.zone += 1;
     GameState.enemyKillCount = 0;
+
+    if (GameState.zone > BalanceConfig.MAX_ZONES) {
+      // Reached completion zone!
+      EventBus.emit(Events.ZONE_CHANGED, GameState.zone);
+      return;
+    }
 
     if (GameState.zone > GameState.stats.maxZoneReached) {
       GameState.stats.maxZoneReached = GameState.zone;
@@ -29,10 +34,7 @@ export const ZoneManager = {
   },
 
   retreatZone(): void {
-    // Boss timer expired, retreat to previous zone
-    if (GameState.zone > 1) {
-      GameState.zone -= 1;
-    }
+    // Boss timer expired, reset progress in current zone (don't retreat)
     GameState.enemyKillCount = 0;
     GameState.bossTimerActive = false;
     GameState.bossTimeRemaining = 0;

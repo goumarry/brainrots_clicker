@@ -36,7 +36,15 @@ export const HeroManager = {
     return total.mul(ascMult).mul(achMult).mul(relicMult);
   },
 
+  canBuyHero(heroIndex: number): boolean {
+    if (heroIndex === 0) return true; // Gigachad is always buyable
+    const prevHeroState = GameState.heroes[heroIndex - 1];
+    return prevHeroState.level > 0;
+  },
+
   buyHero(heroIndex: number): boolean {
+    if (!HeroManager.canBuyHero(heroIndex)) return false;
+
     const cost = HeroManager.getHeroCost(heroIndex);
     if (!GoldManager.canAfford(cost)) return false;
 

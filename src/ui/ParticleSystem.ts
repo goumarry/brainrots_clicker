@@ -31,12 +31,12 @@ export class ParticleSystem {
   }
 
   // Burst of particles on enemy kill
-  spawnKillBurst(x: number, y: number, color: number, count: number = 12): void {
-    if (this.particles.length >= 200) return;
+  spawnKillBurst(x: number, y: number, color: number, count: number = 12, sizeMultiplier: number = 1.0, speedMultiplier: number = 1.0): void {
+    if (this.particles.length >= 500) return;
     for (let i = 0; i < count; i++) {
       const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
-      const speed = 80 + Math.random() * 120;
-      const size = 4 + Math.random() * 6;
+      const speed = (80 + Math.random() * 120) * speedMultiplier;
+      const size = (4 + Math.random() * 6) * sizeMultiplier;
       const life = 0.4 + Math.random() * 0.4;
 
       const gfx = this.getGraphics();

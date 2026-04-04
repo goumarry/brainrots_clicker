@@ -1,10 +1,11 @@
-import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Container, Graphics, Text, Rectangle } from 'pixi.js';
 import { createTextStyle } from '../styles/Typography';
 import { AscensionManager } from '../../core/AscensionManager';
 import { GameState } from '../../core/GameState';
 import { EnemyManager } from '../../core/EnemyManager';
 import { ASCENSION_UPGRADES, AscensionBranch } from '../../config/AscensionData';
 import { EventBus, Events } from '../../systems/EventBus';
+import { formatGold } from '../../systems/NumberFormatter';
 
 const BRANCH_COLORS: Record<AscensionBranch, number> = {
   sigma: 0x9b59b6,
@@ -22,6 +23,32 @@ const BRANCH_LABELS: Record<AscensionBranch, string> = {
   chaos: '🌀 Chaos Path',
 };
 
+const BRANCH_ICONS: Record<AscensionBranch, string> = {
+  sigma: '💪',
+  grind: '💰',
+  speed: '⚡',
+  crit: '🎯',
+  chaos: '🌀',
+};
+
+const CARD_HEIGHT = 110;
+const PADDING = 10;
+const BTN_WIDTH = 120;
+const BTN_HEIGHT = 42;
+
+interface AscensionCard {
+  container: Container;
+  bg: Graphics;
+  nameText: Text;
+  descText: Text;
+  costText: Text;
+  levelText: Text;
+  buyBtn: Graphics;
+  iconText: Text;
+  isPressed: boolean;
+  upgradeId: string;
+}
+
 export class AscensionScreen {
   container: Container;
   private scrollContainer: Container;
@@ -33,6 +60,13 @@ export class AscensionScreen {
   private dragStartY: number = 0;
   private dragStartScrollY: number = 0;
   private totalContentH: number = 0;
+  private cards: AscensionCard[] = [];
+  private hoverId: string | null = null;
+  private soulsText!: Text;
+  private pendingText!: Text;
+  private reqText!: Text;
+  private ascendBtn!: Graphics;
+  private ascendBtnText!: Text;
 
   constructor(width: number, height: number) {
     this.panelW = width;
@@ -40,16 +74,14 @@ export class AscensionScreen {
     this.container = new Container();
 
     const bg = new Graphics();
-    bg.rect(0, 0, width, height);
-    bg.fill(0x0d1b2a);
+    bg.rect(0, 0, width, height).fill(0x0d1b2a);
     this.container.addChild(bg);
 
     this.scrollContainer = new Container();
     this.container.addChild(this.scrollContainer);
 
     this.maskGraphic = new Graphics();
-    this.maskGraphic.rect(0, 0, width, height);
-    this.maskGraphic.fill(0xffffff);
+    this.maskGraphic.rect(0, 0, width, height).fill(0xffffff);
     this.container.addChild(this.maskGraphic);
     this.scrollContainer.mask = this.maskGraphic;
 
@@ -57,23 +89,23 @@ export class AscensionScreen {
     this.build();
 
     EventBus.on(Events.ASCENSION_COMPLETE, () => this.build());
-    EventBus.on(Events.ZONE_CHANGED, () => this.refreshAscendButton());
+    EventBus.on(Events.ZONE_CHANGED, () => this.refreshHeader());
   }
 
   private setupScroll(): void {
     this.container.eventMode = 'static';
+    this.container.hitArea = new Rectangle(0, 0, this.panelW, this.panelH);
     this.container.on('pointerdown', (e) => {
       this.isDragging = true;
       this.dragStartY = e.global.y;
       this.dragStartScrollY = this.scrollY;
     });
-    this.container.on('pointermove', (e) => {
+    window.addEventListener('pointermove', (e) => {
       if (!this.isDragging) return;
-      const dy = e.global.y - this.dragStartY;
+      const dy = e.clientY - this.dragStartY;
       this.setScrollY(this.dragStartScrollY + dy);
     });
-    this.container.on('pointerup', () => { this.isDragging = false; });
-    this.container.on('pointerupoutside', () => { this.isDragging = false; });
+    window.addEventListener('pointerup', () => { this.isDragging = false; });
     this.container.on('wheel', (e) => {
       this.setScrollY(this.scrollY - (e as WheelEvent).deltaY * 0.5);
     });
@@ -86,200 +118,245 @@ export class AscensionScreen {
   }
 
   private build(): void {
-    while (this.scrollContainer.children.length > 0) {
-      this.scrollContainer.removeChildAt(0);
-    }
-
+    this.scrollContainer.removeChildren();
+    this.cards = [];
     let yOffset = 10;
 
-    // Header: Sigma Souls & Record
-    const headerStyle = createTextStyle({ fontSize: 18, fill: 0xc39ef8, fontWeight: '800' });
-    const soulsText = new Text({
+    // Header: Sigma Souls
+    const soulsStyle = createTextStyle({ fontSize: 20, fill: 0xc39ef8, fontWeight: '800' });
+    this.soulsText = new Text({
       text: `🌀 Sigma Souls: ${GameState.sigmaSouls}`,
-      style: headerStyle,
+      style: soulsStyle,
       resolution: window.devicePixelRatio || 2,
     });
-    soulsText.x = 20;
-    soulsText.y = yOffset;
-    this.scrollContainer.addChild(soulsText);
-
-    const recordText = new Text({
-      text: `🏆 Record: Zone ${GameState.stats.maxZoneEver}`,
-      style: createTextStyle({ fontSize: 16, fill: 0xf1c40f }),
-      resolution: window.devicePixelRatio || 2,
-    });
-    recordText.anchor.set(1, 0);
-    recordText.x = this.panelW - 20;
-    recordText.y = yOffset + 2;
-    this.scrollContainer.addChild(recordText);
+    this.soulsText.x = 20;
+    this.soulsText.y = yOffset;
+    this.scrollContainer.addChild(this.soulsText);
     yOffset += 40;
 
-    // Potential Gain
-    const pendingSouls = AscensionManager.getSigmaSoulsReward();
-    const pendingText = new Text({
-      text: pendingSouls > 0 ? `✨ New rewards: +${pendingSouls} souls` : `⏳ No new rewards reached`,
-      style: createTextStyle({ fontSize: 14, fill: pendingSouls > 0 ? 0x44ff88 : 0x8899aa }),
+    // Potential Gain & Requirements
+    this.pendingText = new Text({
+      text: '',
+      style: createTextStyle({ fontSize: 15, fill: 0x8899aa }),
       resolution: window.devicePixelRatio || 2,
     });
-    pendingText.x = 20;
-    pendingText.y = yOffset;
-    this.scrollContainer.addChild(pendingText);
-    yOffset += 24;
+    this.pendingText.x = 20; yOffset += 2;
+    this.pendingText.y = yOffset;
+    this.scrollContainer.addChild(this.pendingText);
 
-    // Requirement text
-    const canAscend = AscensionManager.canAscend();
-    const milestoneTarget = (Math.floor(GameState.highestZoneAscended / 10) + 1) * 10;
-    
-    const reqText = new Text({
-      text: canAscend
-        ? `✅ Milestone reached! (Beat Zone ${milestoneTarget})`
-        : `🔒 Goal: Beat Zone ${milestoneTarget} Boss`,
-      style: createTextStyle({ fontSize: 15, fill: canAscend ? 0x44ff88 : 0xff8844, fontWeight: 'bold' }),
+    this.reqText = new Text({
+      text: '',
+      style: createTextStyle({ fontSize: 14, fill: 0xff8844 }),
       resolution: window.devicePixelRatio || 2,
     });
-    reqText.x = 20;
-    reqText.y = yOffset;
-    this.scrollContainer.addChild(reqText);
+    this.reqText.anchor.set(1, 0); this.reqText.x = this.panelW - 20;
+    this.reqText.y = yOffset;
+    this.scrollContainer.addChild(this.reqText);
     yOffset += 32;
 
     // Ascend button
-    const ascendBtn = new Graphics();
-    ascendBtn.roundRect(20, 0, this.panelW - 40, 66, 12);
-    ascendBtn.fill(canAscend ? 0x6a35c8 : 0x2a2a3a);
-    ascendBtn.roundRect(20, 0, this.panelW - 40, 66, 12);
-    ascendBtn.stroke({ width: 3, color: canAscend ? 0x9b59b6 : 0x3a3a4a });
-    ascendBtn.y = yOffset;
-    this.scrollContainer.addChild(ascendBtn);
+    this.ascendBtn = new Graphics();
+    this.ascendBtn.y = yOffset;
+    this.scrollContainer.addChild(this.ascendBtn);
 
-    const ascendText = new Text({
-      text: `🌀 ASCEND (+${pendingSouls} Sigma Souls)`,
-      style: createTextStyle({ fontSize: 22, fill: canAscend ? 0xffffff : 0x555566, fontWeight: '800', padding: 8 }),
+    this.ascendBtnText = new Text({
+      text: '',
+      style: createTextStyle({ fontSize: 18, fill: 0xffffff, fontWeight: '800' }),
       resolution: window.devicePixelRatio || 2,
     });
-    ascendText.anchor.set(0.5);
-    ascendText.x = this.panelW / 2;
-    ascendText.y = yOffset + 33;
-    this.scrollContainer.addChild(ascendText);
+    this.ascendBtnText.anchor.set(0.5);
+    this.ascendBtnText.x = this.panelW / 2;
+    this.ascendBtnText.y = yOffset + 30;
+    this.scrollContainer.addChild(this.ascendBtnText);
 
-    if (canAscend) {
-      ascendBtn.eventMode = 'static';
-      ascendBtn.cursor = 'pointer';
-      ascendBtn.on('pointerdown', () => {
+    this.ascendBtn.eventMode = 'static';
+    this.ascendBtn.cursor = 'pointer';
+    this.ascendBtn.on('pointerdown', () => {
+      if (AscensionManager.canAscend()) {
         if (AscensionManager.ascend()) {
           EnemyManager.initialSpawn();
           this.build();
         }
-      });
-    }
-    yOffset += 78;
+      }
+    });
 
-    // Separator
-    yOffset += 8;
-    const sep = new Graphics();
-    sep.rect(20, 0, this.panelW - 40, 1);
-    sep.fill(0x2a3a50);
-    sep.y = yOffset;
-    this.scrollContainer.addChild(sep);
-    yOffset += 12;
+    this.refreshHeader();
+    yOffset += 80;
 
-    // Branches
     const branches: AscensionBranch[] = ['sigma', 'grind', 'speed', 'crit', 'chaos'];
     for (const branch of branches) {
       const branchUpgrades = ASCENSION_UPGRADES.filter(u => u.branch === branch);
 
       const branchLabel = new Text({
         text: BRANCH_LABELS[branch],
-        style: createTextStyle({ fontSize: 20, fill: BRANCH_COLORS[branch] }),
+        style: createTextStyle({ fontSize: 22, fill: BRANCH_COLORS[branch], fontWeight: '900' }),
         resolution: window.devicePixelRatio || 2,
       });
       branchLabel.x = 20;
       branchLabel.y = yOffset;
       this.scrollContainer.addChild(branchLabel);
-      yOffset += 32;
+      yOffset += 35;
 
       for (const upg of branchUpgrades) {
-        const level = AscensionManager.getUpgradeLevel(upg.id);
-        const canAfford = AscensionManager.canAffordUpgrade(upg.id);
-        const maxed = level >= upg.maxLevel;
-        const cost = maxed ? 0 : upg.cost * (level + 1);
+        const cardCont = new Container();
+        cardCont.x = PADDING;
+        cardCont.y = yOffset;
+        cardCont.eventMode = 'static';
+        cardCont.cursor = 'pointer';
 
-        const cardBg = new Graphics();
-        cardBg.roundRect(20, 0, this.panelW - 40, 78, 8);
-        cardBg.fill(0x0d1926);
-        cardBg.roundRect(20, 0, this.panelW - 40, 78, 8);
-        cardBg.stroke({ width: 1.5, color: maxed ? BRANCH_COLORS[branch] : 0x1e2d3e });
-        cardBg.y = yOffset;
-        this.scrollContainer.addChild(cardBg);
+        const bg = new Graphics();
+        cardCont.addChild(bg);
+        
+        // Icon Background (Silhouettes style from HeroPanel)
+        const iconContainer = new Container();
+        const iconMask = new Graphics();
+        iconMask.roundRect(0, 0, this.panelW - PADDING * 2, CARD_HEIGHT, 12).fill(0xffffff);
+        iconContainer.mask = iconMask;
+        cardCont.addChild(iconMask);
+        cardCont.addChild(iconContainer);
 
-        const upgName = new Text({
-          text: `${upg.name} (${level}/${upg.maxLevel})`,
-          style: createTextStyle({ fontSize: 18, fill: maxed ? BRANCH_COLORS[branch] : 0xffffff }),
+        const iconText = new Text({
+          text: BRANCH_ICONS[upg.branch],
+          style: createTextStyle({ fontSize: 80, fill: 0xffffff }),
           resolution: window.devicePixelRatio || 2,
         });
-        upgName.x = 35;
-        upgName.y = yOffset + 12;
-        this.scrollContainer.addChild(upgName);
+        iconText.anchor.set(0.5);
+        iconText.x = this.panelW - 130;
+        iconText.y = CARD_HEIGHT / 2;
+        iconText.rotation = -Math.PI / 10;
+        iconText.alpha = 0.08;
+        iconContainer.addChild(iconText);
 
-        const upgDesc = new Text({
-          text: upg.description,
-          style: createTextStyle({ fontSize: 15, fill: 0x8899aa }),
-          resolution: window.devicePixelRatio || 2,
-        });
-        upgDesc.x = 35;
-        upgDesc.y = yOffset + 40;
-        this.scrollContainer.addChild(upgDesc);
+        const nameT = new Text({ text: '', style: createTextStyle({ fontSize: 21, fill: 0xffffff, fontWeight: '900' }), resolution: 1.5 });
+        nameT.x = 20; nameT.y = 18;
+        cardCont.addChild(nameT);
 
-        if (!maxed) {
-          const btnW = 120;
-          const btnH = 42;
-          const btn = new Graphics();
-          btn.roundRect(this.panelW - 35 - btnW, 18, btnW, btnH, 8);
-          btn.fill(canAfford ? 0x6a35c8 : 0x1a2332);
-          btn.y = yOffset;
-          this.scrollContainer.addChild(btn);
+        const levelT = new Text({ text: '', style: createTextStyle({ fontSize: 13, fill: 0x999999 }), resolution: 1.5 });
+        levelT.y = 23; cardCont.addChild(levelT);
 
-          const btnText = new Text({
-            text: `${cost}🌀`,
-            style: createTextStyle({ fontSize: 16, fill: canAfford ? 0xffffff : 0x556677 }),
-            resolution: window.devicePixelRatio || 2,
-          });
-          btnText.anchor.set(0.5);
-          btnText.x = this.panelW - 35 - btnW / 2;
-          btnText.y = yOffset + 18 + btnH / 2;
-          this.scrollContainer.addChild(btnText);
+        const descT = new Text({ text: upg.description, style: createTextStyle({ fontSize: 14, fill: 0x8899aa }), resolution: 1.5 });
+        descT.x = 20; descT.y = 52;
+        cardCont.addChild(descT);
 
-          if (canAfford) {
-            btn.eventMode = 'static';
-            btn.cursor = 'pointer';
-            const upgId = upg.id;
-            btn.on('pointerdown', () => {
-              AscensionManager.buyUpgrade(upgId);
-              this.build();
-            });
+        const costGroup = new Container();
+        costGroup.x = this.panelW - PADDING * 2 - BTN_WIDTH - 15;
+        costGroup.y = CARD_HEIGHT - BTN_HEIGHT - 15;
+        cardCont.addChild(costGroup);
+
+        const buyBtn = new Graphics();
+        buyBtn.eventMode = 'none';
+        costGroup.addChild(buyBtn);
+
+        const costT = new Text({ text: '', style: createTextStyle({ fontSize: 16, fill: 0xffffff }), resolution: 1.5 });
+        costT.anchor.set(0.5);
+        costT.x = BTN_WIDTH / 2; costT.y = BTN_HEIGHT / 2;
+        costGroup.addChild(costT);
+
+        const cardObj: AscensionCard = {
+          container: cardCont, bg, nameText: nameT, descText: descT,
+          costText: costT, levelText: levelT, buyBtn, iconText,
+          isPressed: false, upgradeId: upg.id
+        };
+
+        const currentUpgId = upg.id;
+        cardCont.on('pointerdown', () => {
+          cardObj.isPressed = true;
+          this.updateCard(cardObj);
+          if (AscensionManager.buyUpgrade(currentUpgId)) {
+            this.updateHeader();
+            this.cards.forEach((c: AscensionCard) => this.updateCard(c));
           }
-        } else {
-          const maxedText = new Text({
-            text: 'MAX',
-            style: createTextStyle({ fontSize: 16, fill: BRANCH_COLORS[branch] }),
-            resolution: window.devicePixelRatio || 2,
-          });
-          maxedText.anchor.set(0.5);
-          maxedText.x = this.panelW - 65;
-          maxedText.y = yOffset + 39;
-          this.scrollContainer.addChild(maxedText);
-        }
+        });
 
-        yOffset += 88;
+        const resetPress = () => {
+          cardObj.isPressed = false;
+          this.updateCard(cardObj);
+        };
+        cardCont.on('pointerup', resetPress);
+        cardCont.on('pointerupoutside', resetPress);
+        cardCont.on('pointerover', () => { this.hoverId = upg.id; this.updateCard(cardObj); });
+        cardCont.on('pointerout', () => { this.hoverId = null; this.updateCard(cardObj); });
+
+        this.scrollContainer.addChild(cardCont);
+        this.cards.push(cardObj);
+        this.updateCard(cardObj);
+
+        yOffset += CARD_HEIGHT + PADDING;
       }
-      yOffset += 8;
+      yOffset += 15;
     }
 
-    this.totalContentH = yOffset + 20;
+    this.totalContentH = yOffset + 30;
   }
 
-  private refreshAscendButton(): void {
-    this.build();
+  private updateCard(card: AscensionCard): void {
+    const upg = ASCENSION_UPGRADES.find(u => u.id === card.upgradeId)!;
+    const level = AscensionManager.getUpgradeLevel(upg.id);
+    const cost = Math.floor(upg.cost * Math.pow(2, level));
+    const canAfford = GameState.sigmaSouls >= cost;
+    const isHovered = this.hoverId === upg.id;
+    const maxed = upg.maxLevel !== undefined && level >= upg.maxLevel;
+
+    // Background & Stroke
+    card.bg.clear().roundRect(0, 0, this.panelW - PADDING * 2, CARD_HEIGHT, 12);
+    card.bg.fill(0x1a2433);
+    const sColor = card.isPressed ? 0xffffff : (isHovered ? BRANCH_COLORS[upg.branch] : 0x3d4a60);
+    const sWidth = (card.isPressed || isHovered) ? 2.5 : 1.5;
+    card.bg.stroke({ color: sColor, width: sWidth, alpha: isHovered ? 1.0 : 0.6 });
+
+    // Texts
+    card.nameText.text = upg.name;
+    card.levelText.text = upg.maxLevel !== undefined ? `${level}/${upg.maxLevel}` : `LVL ${level}`;
+    card.levelText.x = card.nameText.x + card.nameText.width + 10;
+    
+    // Icon Highlight
+    card.iconText.alpha = isHovered ? 0.15 : 0.08;
+    card.iconText.style.fill = isHovered ? BRANCH_COLORS[upg.branch] : 0xffffff;
+
+    // Button
+    card.buyBtn.clear().roundRect(0, 0, BTN_WIDTH, BTN_HEIGHT, 10);
+    if (maxed) {
+      card.buyBtn.fill(0x1a1a1a).stroke({ color: 0x444444, width: 1 });
+      card.costText.text = 'MAX';
+      card.costText.style.fill = 0x666666;
+    } else if (canAfford) {
+      card.buyBtn.fill(0x2d5a27).stroke({ color: 0x44ff88, width: 2, alpha: 0.8 });
+      card.costText.text = `${cost}🌀`;
+      card.costText.style.fill = 0xffffff;
+    } else {
+      card.buyBtn.fill(0x2a3544).stroke({ color: 0xffffff, width: 1, alpha: 0.2 });
+      card.costText.text = `${cost}🌀`;
+      card.costText.style.fill = 0x8899aa;
+    }
   }
 
-  update(_deltaSeconds: number): void {}
+  private updateHeader(): void {
+    this.cards.forEach((c: AscensionCard) => this.updateCard(c));
+    this.refreshHeader();
+  }
+
+  private refreshHeader(): void {
+    const pendingSouls = AscensionManager.getSigmaSoulsReward();
+    const canAscend = AscensionManager.canAscend();
+    const milestoneTarget = (Math.floor(GameState.highestZoneAscended / 10) + 1) * 10;
+
+    this.soulsText.text = `🌀 Sigma Souls: ${GameState.sigmaSouls}`;
+    
+    this.pendingText.text = pendingSouls > 0 ? `✨ Gain: +${pendingSouls} souls` : `⏳ No rewards reached`;
+    this.pendingText.style.fill = pendingSouls > 0 ? 0x44ff88 : 0x8899aa;
+
+    this.reqText.text = canAscend ? `✅ Milestone: BEATEN` : `🔒 Goal: Reach Zone ${milestoneTarget + 1}`;
+    this.reqText.style.fill = canAscend ? 0x44ff88 : 0xff8844;
+
+    this.ascendBtn.clear().roundRect(20, 0, this.panelW - 40, 60, 12);
+    this.ascendBtn.fill(canAscend ? 0x6a35c8 : 0x2a2a3a);
+    this.ascendBtn.stroke({ width: 2, color: canAscend ? 0x9b59b6 : 0x3a3a4a });
+
+    this.ascendBtnText.text = `🌀 ASCEND (+${pendingSouls} Sigma Souls)`;
+    this.ascendBtnText.style.fill = canAscend ? 0xffffff : 0x555566;
+  }
+
+  update(_deltaSeconds: number): void {
+    // No pulse yet, but icon animation could go here
+  }
 }

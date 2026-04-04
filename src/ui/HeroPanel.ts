@@ -205,20 +205,40 @@ export class HeroPanel {
         card.dpsText.x = this.panelW - 35; card.dpsText.anchor.set(1, 0); 
     } else { card.levelText.visible = false; card.dpsText.visible = false; }
 
+    const canBuy = HeroManager.canBuyHero(i);
     card.actionGroup.visible = isUnlocked;
+    
     if (isUnlocked) {
-        card.costText.text = `${formatGold(HeroManager.getHeroCost(i))}💰`;
+        if (canBuy) {
+            card.costText.text = `${formatGold(HeroManager.getHeroCost(i))}💰`;
+            card.costText.style.fill = 0xffffff;
+        } else {
+            card.costText.text = `ACHÈTE LE PRÉCÉDENT`;
+            card.costText.style.fill = 0xffaaaa;
+            card.costText.style.fontSize = 12;
+        }
         this.updateButtonGraphics(i);
     }
   }
 
   private updateButtonGraphics(i: number): void {
     const card = this.cards[i];
-    const canAfford = GameState.gold.gte(HeroManager.getHeroCost(i));
+    const cost = HeroManager.getHeroCost(i);
+    const canAfford = GameState.gold.gte(cost);
+    const canBuy = HeroManager.canBuyHero(i);
+    
     card.buyBtn.clear().roundRect(0, 0, BTN_WIDTH, BTN_HEIGHT, 12);
-    card.buyBtn.fill(canAfford ? 0x2d5a27 : 0x2a3544);
-    if (canAfford) card.buyBtn.stroke({ color: 0x44ff88, width: 2, alpha: 0.8 });
-    else card.buyBtn.stroke({ color: 0xffffff, width: 1, alpha: 0.2 });
+    
+    if (!canBuy) {
+        card.buyBtn.fill(0x1a1a1a); // Very dark gray for locked dependency
+        card.buyBtn.stroke({ color: 0x444444, width: 1.5, alpha: 0.5 });
+    } else if (canAfford) {
+        card.buyBtn.fill(0x2d5a27);
+        card.buyBtn.stroke({ color: 0x44ff88, width: 2, alpha: 0.8 });
+    } else {
+        card.buyBtn.fill(0x2a3544);
+        card.buyBtn.stroke({ color: 0xffffff, width: 1, alpha: 0.2 });
+    }
   }
 
   private updateButtons(): void {

@@ -9,9 +9,9 @@ import { CrazyGamesSDK } from '../integrations/CrazyGamesSDK';
 export const AscensionManager = {
   canAscend(): boolean {
     const nextMilestone = (Math.floor(GameState.highestZoneAscended / 10) + 1) * 10;
-    // To ensure boss of nextMilestone is beaten, we must be AT zone (nextMilestone + 1)
-    const finalTarget = nextMilestone + 1;
-    return GameState.zone >= finalTarget;
+    
+    // If the next milestone is BEHIND our current zone (or we just beat it)
+    return GameState.zone > nextMilestone;
   },
 
   getSigmaSoulsReward(): number {
@@ -96,8 +96,8 @@ export const AscensionManager = {
     const upgDef = ASCENSION_UPGRADES.find(u => u.id === upgradeId);
     if (!upgDef) return false;
     const currentLevel = AscensionManager.getUpgradeLevel(upgradeId);
-    if (currentLevel >= upgDef.maxLevel) return false;
-    const cost = upgDef.cost * (currentLevel + 1);
+    if (upgDef.maxLevel !== undefined && currentLevel >= upgDef.maxLevel) return false;
+    const cost = Math.floor(upgDef.cost * Math.pow(2, currentLevel));
     return GameState.sigmaSouls >= cost;
   },
 
@@ -106,7 +106,7 @@ export const AscensionManager = {
     const upgDef = ASCENSION_UPGRADES.find(u => u.id === upgradeId);
     if (!upgDef) return false;
     const currentLevel = AscensionManager.getUpgradeLevel(upgradeId);
-    const cost = upgDef.cost * (currentLevel + 1);
+    const cost = Math.floor(upgDef.cost * Math.pow(2, currentLevel));
     GameState.sigmaSouls -= cost;
 
     let entry = GameState.ascensionUpgrades.find(u => u.id === upgradeId);

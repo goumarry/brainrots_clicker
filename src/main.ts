@@ -11,6 +11,7 @@ import { SkillManager } from './core/SkillManager';
 import { OfflineManager } from './core/OfflineManager';
 import { BalanceConfig } from './config/BalanceConfig';
 import { AchievementManager } from './core/AchievementManager';
+import { AdManager } from './integrations/AdManager';
 import { CrazyGamesSDK } from './integrations/CrazyGamesSDK';
 
 export const GAME_W = 1280;
@@ -102,6 +103,7 @@ async function main(): Promise<void> {
     const deltaSeconds = ticker.deltaMS / 1000;
 
     SkillManager.tick(deltaSeconds);
+    AdManager.tick(deltaSeconds);
     DamageManager.applyDPSTick(deltaSeconds);
 
     if (GameState.bossTimerActive) {

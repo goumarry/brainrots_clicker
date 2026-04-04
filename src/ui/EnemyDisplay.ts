@@ -78,6 +78,8 @@ export class EnemyDisplay {
   private mobProgressText: Text;
   private bossTimerText: Text;
   private bossTimerBar: Graphics;
+  private hpBarY: number = 0;
+  private bossBarH: number = 33;
   
   // Background Layers
   private backgroundLayer: Container;
@@ -107,6 +109,7 @@ export class EnemyDisplay {
   private currentSprite: Sprite | Text | Container | null = null;
   private floatOffset: number = 0;
   private floatTime: number = 0;
+  private bossPulse: number = 0;
 
   // Track listeners for cleanup
   private boundOnEnemyUpdate: any;
@@ -166,22 +169,20 @@ export class EnemyDisplay {
     this.foregroundLayer = new Container();
     this.container.addChild(this.foregroundLayer);
 
-    // Mask setup
+    // No masking needed for fullscreen edge-to-edge
     this.bgMask = new Graphics();
-    this.bgMask.roundRect(0, 0, width, height, 15).fill(0xffffff);
     this.container.addChild(this.bgMask); 
     this.bgMask.alpha = 0; 
-    this.backgroundLayer.mask = this.bgMask;
-    this.foregroundLayer.mask = this.bgMask;
 
-    // UI Bars
+    // UI Bars (Repositioned for Fullscreen HUD)
     const barW = Math.floor(width * 0.6);
-    const barH = 33; 
+    const barH = this.bossBarH; 
     const barX = Math.floor((width - barW) / 2);
-    const barY = Math.floor(height - 85); 
+    // Floating higher above SkillBar (which is 120H)
+    this.hpBarY = Math.floor(height - 210); 
 
     this.hpBarBg = new Graphics();
-    this.hpBarBg.roundRect(barX, barY, barW, barH, 4).fill(0x1a1a1a);
+    this.hpBarBg.roundRect(barX, this.hpBarY, barW, barH, 4).fill(0x1a1a1a);
     this.container.addChild(this.hpBarBg);
 
     this.hpBar = new Graphics();
@@ -194,27 +195,27 @@ export class EnemyDisplay {
     });
     this.hpText.anchor.set(0.5, 0.5);
     this.hpText.x = Math.floor(width / 2);
-    this.hpText.y = Math.floor(barY + barH / 2);
+    this.hpText.y = Math.floor(this.hpBarY + barH / 2);
     this.container.addChild(this.hpText);
 
     this.enemyNameText = new Text({
       text: '',
-      style: createTextStyle({ fontSize: 26, fill: 0xffffff, fontWeight: '900', stroke: { color: 0x000000, width: 4 }, padding: 10 }),
+      style: createTextStyle({ fontSize: 26, fill: 0xffffff, fontWeight: '900', stroke: { color: 0x000000, width: 4.5 }, dropShadow: { color: 0x000000, alpha: 0.4, blur: 4, distance: 2 }, padding: 10 }),
       resolution: window.devicePixelRatio || 2,
     });
     this.enemyNameText.anchor.set(0.5, 0);
     this.enemyNameText.x = Math.floor(width / 2);
-    this.enemyNameText.y = 15; 
+    this.enemyNameText.y = 110; // Exactly below Stats Bar
     this.container.addChild(this.enemyNameText);
 
     this.mobProgressText = new Text({
       text: '',
-      style: createTextStyle({ fontSize: 18, fill: 0x7ec8e3, padding: 8 }),
+      style: createTextStyle({ fontSize: 18, fill: 0x7ec8e3, fontWeight: '900', stroke: { color: 0x000000, width: 3.5 }, dropShadow: { color: 0x000000, alpha: 0.4, blur: 3, distance: 2 }, padding: 8 }),
       resolution: window.devicePixelRatio || 2,
     });
     this.mobProgressText.anchor.set(1, 0);
-    this.mobProgressText.x = width - 40;
-    this.mobProgressText.y = 20;
+    this.mobProgressText.x = width - 25; // Balanced 25px margin
+    this.mobProgressText.y = 110;
     this.container.addChild(this.mobProgressText);
 
     this.bossTimerBar = new Graphics();
@@ -434,14 +435,32 @@ export class EnemyDisplay {
             shadow.tint = 0x000000; shadow.alpha = 0.3; shadow.position.set(25, 25);
             this.enemyIconContainer.addChild(shadow, s);
             this.currentSprite = s;
-        } else this.generateProcedural(name, true, true);
-    } else this.generateProcedural(name, isBoss, isIntermediateBoss);
+        } else this.generateProcedural(name, true, false, false); // Fallback
+    } else if (isIntermediateBoss) {
+        // PROCEDURAL MINI-BOSS (As requested: Darker, Larger, with Teeth)
+        this.generateProcedural(name, true, false, true);
+    } else {
+        this.generateProcedural(name, false, false, false);
+    }
   }
 
-  private generateProcedural(name: string, isBoss: boolean, isSpecial: boolean): void {
+  private generateProcedural(name: string, isBoss: boolean, isSpecial: boolean, isMiniBoss: boolean = false): void {
     const colors = [0x4a9eff, 0xff4a9e, 0x9eff4a, 0xffd700, 0x8a2be2];
-    const color = colors[Math.floor(Math.random() * colors.length)];
-    let size = 120 + Math.random() * 60; if (isSpecial) size *= 2.4; 
+    let color = colors[Math.floor(Math.random() * colors.length)];
+    
+    // Mini-bosses are darker variants
+    if (isMiniBoss) {
+      // Very crude darken: divide components by 2
+      const r = ((color >> 16) & 0xff) >> 1;
+      const g = ((color >> 8) & 0xff) >> 1;
+      const b = (color & 0xff) >> 1;
+      color = (r << 16) | (g << 8) | b;
+    }
+
+    let size = 120 + Math.random() * 60; 
+    if (isSpecial) size *= 2.4; 
+    if (isMiniBoss) size *= 1.45; // 45% larger than base
+
     const shapeType = Math.floor(Math.random() * 3); const sOff = size * 0.12;
 
     const sg = this.enemyShadow; sg.clear();
@@ -482,6 +501,29 @@ export class EnemyDisplay {
         eg.circle(-size*0.35, eyeY, eyeS*0.55).fill(0x000000).circle(size*0.35, eyeY, eyeS*0.55).fill(0x000000);
         eg.circle(-size*0.35 - eyeS*0.2, eyeY-eyeS*0.2, eyeS*0.2).fill(0xffffff).circle(size*0.35-eyeS*0.2, eyeY-eyeS*0.2, eyeS*0.2).fill(0xffffff);
     }
+
+    // DRAW MOUTH & TEETH FOR MINI-BOSSES
+    if (isMiniBoss) {
+      const mg = new Graphics();
+      const mouthY = size * 0.25;
+      const mouthW = size * 0.8;
+      const mouthH = size * 0.4;
+      
+      // Black mouth shape
+      mg.ellipse(0, mouthY, mouthW/2, mouthH/2).fill(0x111111).stroke({ color: 0x000000, width: 2 });
+      
+      // Sharp Teeth (White triangles)
+      const teethCount = 6;
+      for (let i = 0; i < teethCount; i++) {
+        const tx = -mouthW/2 + (i + 0.5) * (mouthW / teethCount);
+        // Top teeth
+        mg.poly([tx - 6, mouthY - mouthH/4, tx + 6, mouthY - mouthH/4, tx, mouthY - 4]).fill(0xffffff);
+        // Bottom teeth
+        mg.poly([tx - 6, mouthY + mouthH/4, tx + 6, mouthY + mouthH/4, tx, mouthY + 4]).fill(0xffffff);
+      }
+      this.enemyIconContainer.addChild(mg);
+    }
+
     this.currentSprite = this.enemyIconContainer;
   }
 
@@ -489,8 +531,9 @@ export class EnemyDisplay {
     this.hpText.text = formatNumber(hp);
     const ratio = hp.div(maxHp).toNumber(); const barW = Math.floor(this.areaW * 0.6);
     this.hpBar.clear();
+    const barY = this.hpBarY;
     if (ratio > 0) {
-        this.hpBar.roundRect(Math.floor((this.areaW - barW)/2), this.areaH - 85, Math.max(1, barW * ratio), 33, 4).fill(isBoss ? 0xff4444 : 0x44ff44);
+        this.hpBar.roundRect(Math.floor((this.areaW - barW)/2), barY, Math.max(1, barW * ratio), this.bossBarH, 4).fill(isBoss ? 0xff4444 : 0x44ff44);
     }
   }
 
@@ -509,10 +552,11 @@ export class EnemyDisplay {
     this.bossTimerText.text = `TIME: ${Math.ceil(timeLeft)}s`;
     const barW = Math.floor(this.areaW * 0.6); const ratio = timeLeft / totalTime;
     this.bossTimerBar.clear();
+    const timerY = this.hpBarY - 45; 
     if (ratio > 0) {
-        this.bossTimerBar.roundRect(Math.floor((this.areaW - barW)/2), this.areaH - 130, Math.max(4, barW * ratio), 33, 4).fill(0xff6666);
+        this.bossTimerBar.roundRect(Math.floor((this.areaW - barW)/2), timerY, Math.max(4, barW * ratio), this.bossBarH, 4).fill(0xff6666);
     }
-    this.bossTimerText.position.set(Math.floor(this.areaW / 2), this.areaH - 113.5);
+    this.bossTimerText.position.set(Math.floor(this.areaW / 2), timerY + this.bossBarH / 2);
     this.bossTimerText.visible = true; this.bossTimerBar.visible = true;
   }
 

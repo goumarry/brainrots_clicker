@@ -30,10 +30,11 @@ export class StatsDisplay {
     this.overlay = overlay;
     this.container = new Container();
 
-    // Top bar background
+    // Top bar background (Glassmorphism style)
     this.topBar = new Graphics();
-    this.topBar.rect(0, 0, width, height);
-    this.topBar.fill(0x0d1b2a);
+    this.topBar.rect(0, 0, width, height).fill({ color: 0x0d1b2a, alpha: 0.75 });
+    // Subtle border
+    this.topBar.rect(0, height - 2, width, 2).fill({ color: 0x1e3a5f, alpha: 0.5 });
     this.container.addChild(this.topBar);
 
     const cy = height / 2;

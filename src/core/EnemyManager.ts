@@ -165,6 +165,18 @@ export const EnemyManager = {
 
   spawnNextNormal(): void {
     const zone = GameState.zone;
+    if (zone > BalanceConfig.MAX_ZONES) {
+      // Completion zone - no enemies
+      GameState.currentEnemy = {
+        name: 'ALL CLEAR',
+        currentHP: toBigNum(0),
+        maxHP: toBigNum(0),
+        isBoss: false,
+        killCount: 0,
+      };
+      EventBus.emit(Events.ENEMY_SPAWNED, GameState.currentEnemy);
+      return;
+    }
     const maxHP = BalanceConfig.enemyHP(zone - 1);
     const name = getEnemyName(zone, false);
 

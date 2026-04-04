@@ -52,6 +52,12 @@ export const SaveManager = {
       };
 
       GameState.deserialize(data);
+      
+      // Reset progress if we were at a boss (killCount >= 10)
+      // This forces the player to re-beat the 10 mobs on refresh
+      if (GameState.enemyKillCount >= 10) {
+          GameState.enemyKillCount = 0;
+      }
 
       // If no skills were saved, initialize them
       if (GameState.skills.length === 0) {

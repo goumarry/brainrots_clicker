@@ -2,7 +2,7 @@ import { Decimal, toBigNum } from '../systems/BigNumber';
 
 export const BalanceConfig = {
   // Zone settings
-  MAX_ZONES: 200,
+  MAX_ZONES: 410,
   ENEMIES_PER_ZONE: 10,
   BOSS_ZONE_INTERVAL: 5,  // Boss every 5 zones
   BOSS_HP_MULTIPLIER: 10,
@@ -22,7 +22,7 @@ export const BalanceConfig = {
   ENEMY_HP_GROWTH: 1.55,
 
   // Click damage
-  CLICK_DPS_RATIO: 0.01,    // Click deals 1% of total DPS
+  CLICK_DPS_RATIO: 0.01,    // Click deals 1% of total DPS (Sigma Strike)
   MIN_CLICK_DAMAGE: 1,
 
   // Auto-save interval in ms
@@ -41,7 +41,7 @@ export const BalanceConfig = {
   goldPerKill(zone: number, goldMultiplier: Decimal): Decimal {
     // New Exponential Base: 1 multiplied by 1.5 for every zone reached
     // Zone 1 = 1, Zone 2 = 1.5, Zone 3 = 2.25, etc.
-    const baseGold = toBigNum(1.5).pow(zone - 1);
+    const baseGold = toBigNum(BalanceConfig.GOLD_ZONE_EXPONENT).pow(zone - 1);
     return baseGold.mul(goldMultiplier).floor();
   },
 

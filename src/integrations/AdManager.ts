@@ -7,18 +7,22 @@ import { HeroManager } from '../core/HeroManager';
 export const AdManager = {
   // x2 gold for 30 minutes
   watchAdDoubleGold(): void {
+    if (GameState.goldBoostTimeLeft > 0) return;
+    
     CrazyGamesSDK.requestRewardedAd(() => {
-      GameState.goldBoostTimeLeft += 30 * 60; // 1800s
-      EventBus.emit(Events.FLOATING_TEXT, '🔥 Gold x2 Boost Applied!', 640, 360, 0xffd700);
+      GameState.goldBoostTimeLeft = 30 * 60; // 1800s
+      EventBus.emit(Events.FLOATING_TEXT, '🔥 Gold x2 Boost Applied!', 500, 300, 0xffd700);
     });
   },
 
   // x2 DPS for 30 minutes
   watchAdDoubleDPS(): void {
+    if (GameState.dpsBoostTimeLeft > 0) return;
+    
     CrazyGamesSDK.requestRewardedAd(() => {
-      GameState.dpsBoostTimeLeft += 30 * 60; // 1800s
+      GameState.dpsBoostTimeLeft = 30 * 60; // 1800s
       HeroManager.recalculateDPS();
-      EventBus.emit(Events.FLOATING_TEXT, '⚔️ DPS x2 Boost Applied!', 640, 360, 0xff4444);
+      EventBus.emit(Events.FLOATING_TEXT, '⚔️ DPS x2 Boost Applied!', 500, 300, 0xff4444);
     });
   },
 
@@ -49,7 +53,8 @@ export const AdManager = {
         EventBus.emit(Events.RELIC_DROPPED, relic);
       }
       
-      EventBus.emit(Events.FLOATING_TEXT, `💎 Diamond Relic: ${relic.name}!`, 640, 360, 0x00e5ff);
+      const pos = { x: 500, y: 300 }; // Center-ish in local combat zone
+      EventBus.emit(Events.FLOATING_TEXT, `💎 Diamond Relic: ${relic.name}!`, pos.x, pos.y, 0x00e5ff);
       HeroManager.recalculateDPS();
     });
   },
@@ -68,9 +73,22 @@ export const AdManager = {
       
       const state = GameState.heroes[latestIdx];
       state.level += 5;
+      
+      const pos = { x: 500, y: 300 };
       HeroManager.recalculateDPS();
       EventBus.emit(Events.HERO_BOUGHT, latestIdx, state.level);
-      EventBus.emit(Events.FLOATING_TEXT, `🚀 +5 Levels for ${latestIdx === 0 ? 'Nous' : 'Hero ' + latestIdx}!`, 640, 360, 0x76ff03);
+      EventBus.emit(Events.FLOATING_TEXT, `🚀 +5 Levels for ${latestIdx === 0 ? 'Nous' : 'Hero ' + latestIdx}!`, pos.x, pos.y, 0x76ff03);
+    });
+  },
+
+  // Reset all skill cooldowns
+  watchAdResetSkills(): void {
+    CrazyGamesSDK.requestRewardedAd(() => {
+      GameState.skills.forEach(s => {
+        s.cooldownRemaining = 0;
+      });
+      const pos = { x: 500, y: 300 };
+      EventBus.emit(Events.FLOATING_TEXT, '⏱️ Skills Reset!', pos.x, pos.y, 0xffffff);
     });
   },
 
@@ -99,6 +117,12 @@ export const AdManager = {
             changed = true;
             HeroManager.recalculateDPS();
         }
+    }
+    if (GameState.relicBoostCooldown > 0) {
+        GameState.relicBoostCooldown = Math.max(0, GameState.relicBoostCooldown - delta);
+    }
+    if (GameState.heroBoostCooldown > 0) {
+        GameState.heroBoostCooldown = Math.max(0, GameState.heroBoostCooldown - delta);
     }
   },
 

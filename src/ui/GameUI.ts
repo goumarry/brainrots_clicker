@@ -39,6 +39,7 @@ export class GameUI {
   private skillBar!: SkillBar;
   private tabBar!: TabBar;
   private uiOverlay!: Container;
+  private combatRoot: Container = new Container();
 
   private ascensionScreen!: AscensionScreen;
   private relicScreen!: RelicScreen;
@@ -144,101 +145,92 @@ export class GameUI {
     this.settingsScreen.container.visible = false;
     this.root.addChild(this.settingsScreen.container);
 
-    // 5. Right Area
+    // 5. COMBAT ZONE ISOLATION (Strict masking and local container)
     const rightX = lw;
-
-    // Stats bar (Top Right)
-    this.uiOverlay = new Container();
-    this.uiOverlay.sortableChildren = true;
-    this.statsDisplay = new StatsDisplay(rw, this.uiOverlay, th);
-    this.statsDisplay.container.x = rightX;
-    this.root.addChild(this.statsDisplay.container);
-
-    // Header (No border on right side anymore)
-
-    // Layout spacing
     const padding = 20;
 
-    // Ad Rewards Panel (Far Right, Inset)
-    const adPanelX = sw - aw - padding;
-    const adPanelY = th + padding;
-    const adPanelH = sh - th - shh - padding * 2;
-    this.adRewardsPanel = new AdRewardsPanel(aw, adPanelH);
-    this.adRewardsPanel.container.x = adPanelX;
-    this.adRewardsPanel.container.y = adPanelY;
-    this.root.addChild(this.adRewardsPanel.container);
- 
-    // Combat Area (Center-Right, Inset)
-    const enemyAreaX = rightX + padding;
-    const enemyAreaW = adPanelX - enemyAreaX - padding;
-    const combatAreaH = sh - th - shh - padding * 2;
-    const enemyDisplayY = th + padding;
- 
-    // Enemy Display
+    this.combatRoot = new Container();
+    this.combatRoot.x = rightX;
+    this.root.addChild(this.combatRoot);
+
+    // Apply strict mask to ensure NO bleed-over into the Hero Panel
+    const combatMask = new Graphics();
+    combatMask.rect(0, 0, rw, sh).fill(0xffffff);
+    this.combatRoot.addChild(combatMask);
+    this.combatRoot.mask = combatMask;
+
+    // Enemy Display (Now local to combatRoot)
     if (this.enemyDisplay) this.enemyDisplay.destroy();
-    this.enemyDisplay = new EnemyDisplay(enemyAreaW, combatAreaH);
-    this.enemyDisplay.setBasePosition(enemyAreaX, enemyDisplayY);
-    this.root.addChild(this.enemyDisplay.container);
- 
-    // Click zone (Matches Enemy Display exactly)
+    this.enemyDisplay = new EnemyDisplay(rw, sh);
+    this.enemyDisplay.setBasePosition(0, 0); 
+    this.combatRoot.addChild(this.enemyDisplay.container);
+
+    // Click zone (Local to combatRoot)
     const clickZone = new Graphics();
-    clickZone.rect(enemyAreaX, enemyDisplayY, enemyAreaW, combatAreaH);
+    clickZone.rect(0, 0, rw, sh);
     clickZone.fill({ color: 0xffffff, alpha: 0 });
     clickZone.eventMode = 'static';
     clickZone.cursor = 'pointer';
-    this.enemyCenterX = enemyAreaX + enemyAreaW / 2;
-    this.enemyCenterY = enemyDisplayY + combatAreaH / 2;
- 
+    this.enemyCenterX = rw / 2;
+    this.enemyCenterY = sh / 2;
+
     clickZone.on('pointerdown', (e) => {
-      const local = e.getLocalPosition(this.root);
+      const local = e.getLocalPosition(this.combatRoot);
       ClickManager.handleClick(local.x, local.y);
     });
-    this.root.addChild(clickZone);
- 
-    // Active Skills HUD (Bottom-Left of combat area, inverted stack)
-    this.activeSkillsHUD = new ActiveSkillsDisplay();
-    this.activeSkillsHUD.container.x = enemyAreaX + 15;
-    this.activeSkillsHUD.container.y = enemyDisplayY + combatAreaH - 70; // Anchor at BOTTOM-LEFT
-    this.root.addChild(this.activeSkillsHUD.container);
- 
-    // Skill Bar (Bottom Right)
+    this.combatRoot.addChild(clickZone);
+
+    // 6. HUD OVERLAYS (Local to combatRoot)
+    this.uiOverlay = new Container();
+    this.uiOverlay.sortableChildren = true;
+    this.combatRoot.addChild(this.uiOverlay);
+
+    // Stats bar (Top Overlay)
+    this.statsDisplay = new StatsDisplay(rw, this.uiOverlay, th);
+    this.statsDisplay.container.x = 0;
+    this.uiOverlay.addChild(this.statsDisplay.container);
+
+    // Ad Rewards Panel (Right Overlay)
+    const adPanelX = rw - aw - padding;
+    const adPanelY = th + padding + 60;
+    const adPanelH = sh - th - shh - 100;
+    this.adRewardsPanel = new AdRewardsPanel(aw, adPanelH);
+    this.adRewardsPanel.container.x = adPanelX;
+    this.adRewardsPanel.container.y = adPanelY;
+    this.uiOverlay.addChild(this.adRewardsPanel.container);
+
+    // Skill Bar (Bottom Overlay)
     const skillBarY = sh - shh;
-    const skillBarBg = new Graphics();
-    skillBarBg.rect(rightX, skillBarY, rw, shh);
-    skillBarBg.fill(0x0d1825);
-    this.root.addChild(skillBarBg);
-
     this.skillBar = new SkillBar(rw, this.uiOverlay);
-    this.skillBar.container.x = rightX;
+    this.skillBar.container.x = 0;
     this.skillBar.container.y = skillBarY;
-    this.root.addChild(this.skillBar.container);
- 
-    // CRITICAL: uiOverlay was never added to the stage!
-    this.root.addChild(this.uiOverlay);
+    this.uiOverlay.addChild(this.skillBar.container);
 
+    // Active Skills HUD (Elevated to avoid overlap with Skill Bar)
+    this.activeSkillsHUD = new ActiveSkillsDisplay();
+    this.activeSkillsHUD.container.x = 25;
+    this.activeSkillsHUD.container.y = sh - shh - 85; 
+    this.uiOverlay.addChild(this.activeSkillsHUD.container);
 
+    // Relic status text (Persistent label)
+    this.relicStatusText = new Text({
+      text: '',
+      style: createTextStyle({ fontSize: 16, fill: 0xaaaaaa, fontWeight: '900', stroke: { color: 0x000000, width: 3.5 }, dropShadow: { color: 0x000000, alpha: 0.4, blur: 4, distance: 2 }, padding: 8 }),
+      resolution: window.devicePixelRatio || 2,
+    });
+    this.relicStatusText.x = 25; // 25px margin for alignment with toasts
+    this.relicStatusText.y = th + 20; // 110px total Y
+    this.uiOverlay.addChild(this.relicStatusText);
 
-    // FX layers
+    // 7. FX layers (Local to combatRoot)
     const floatingContainer = new Container();
-    this.root.addChild(floatingContainer);
+    this.combatRoot.addChild(floatingContainer);
     this.floatingTextManager = new FloatingTextManager(floatingContainer);
 
     const particleContainer = new Container();
     particleContainer.eventMode = 'none';
-    this.root.addChild(particleContainer);
+    this.combatRoot.addChild(particleContainer);
     this.particleSystem = new ParticleSystem(particleContainer);
- 
-    // Relic status text (Top Left of combat area, matching Mob Progress elevation)
-    this.relicStatusText = new Text({
-      text: '',
-      style: createTextStyle({ fontSize: 13, fill: 0xaaaaaa, fontWeight: 'bold' }),
-      resolution: window.devicePixelRatio || 2,
-    });
-    this.relicStatusText.x = enemyAreaX + 20; // Symmetric with adPanelX - 15/20
-    this.relicStatusText.y = th + padding + 20; // MATCHES EnemyDisplay's mobProgressText.y
-    this.root.addChild(this.relicStatusText);
-
-    this.root.addChild(this.uiOverlay);
  
     // GLOBAL DIVIDERS (Top-most layer)
     const globalDividers = new Graphics();
@@ -315,28 +307,32 @@ export class GameUI {
     });
 
     EventBus.on(Events.ZONE_CHANGED, (zone) => {
-      this.showToast(`✨ Zone ${zone} ✨`, true, 2.5, 'top-right');
-      this.particleSystem.spawnZoneCelebration(this.leftW + (this.screenW - this.leftW) / 2, this.screenH / 2);
+      this.showToast(`✨ Zone ${zone} ✨`, true, 2.8, 'top-right', 0x00e5ff);
+      this.particleSystem.spawnZoneCelebration(this.rightW / 2, this.screenH / 2);
     });
 
     EventBus.on(Events.ENEMY_DIED, (_g, isBoss) => {
         const color = (isBoss as boolean) ? 0xff4444 : 0x44ff88;
-        this.particleSystem.spawnKillBurst(this.screenW/2 + 200, this.screenH/2, color, 15);
+        const count = (isBoss as boolean) ? 30 : 16;
+        const scale = (isBoss as boolean) ? 10.5 : 7.5;
+        this.particleSystem.spawnKillBurst(this.rightW / 2, this.screenH / 2, color, count, scale, 3.0);
     });
 
     EventBus.on(Events.ACHIEVEMENT_UNLOCKED, (id) => {
       const ach = ACHIEVEMENT_DATA.find(a => a.id === id);
-      if (ach) this.showToast(`🏆 Achievement: ${ach.name}!`, true, 3, 'center');
+      if (ach) this.showToast(`🏆 Achievement: ${ach.name}!`, true, 3.5, 'center', 0xffaa00);
     });
 
     EventBus.on(Events.RELIC_DROPPED, (relic) => {
       const r = relic as RelicInstance;
-      this.showToast(`🏺 Relic dropped: ${r.emoji} ${r.name}!`, true, 4, 'top-left');
+      const col = r.rarity === 'Diamond' ? 0x00e5ff : (r.rarity === 'Gold' ? 0xffd700 : (r.rarity === 'Silver' ? 0xbdc3c7 : 0xcd7f32));
+      this.showToast(`🏺 Relic dropped: ${r.emoji} ${r.name}!`, true, 4.5, 'top-left', col);
     });
 
     EventBus.on(Events.RELIC_FUSED, (relic) => {
       const r = relic as RelicInstance;
-      this.showToast(`✨ FUSION! ${r.name} upgraded to ${r.rarity}! ✨`, true, 4, 'top-left');
+      const col = r.rarity === 'Diamond' ? 0x00e5ff : (r.rarity === 'Gold' ? 0xffd700 : (r.rarity === 'Silver' ? 0xbdc3c7 : 0xcd7f32));
+      this.showToast(`✨ FUSION! ${r.name} upgraded to ${r.rarity}! ✨`, true, 4.5, 'top-left', col);
     });
  
     EventBus.on(Events.SKILL_ANIMATION_TRIGGERED, (data: any) => {
@@ -344,21 +340,23 @@ export class GameUI {
     });
   }
 
-  private showToast(message: string, isBig: boolean = false, duration: number = 2.5, pos: 'center' | 'top-left' | 'top-right' = 'center'): void {
-    // Calculate combat area dimensions for centering
+  private showToast(message: string, isBig: boolean = false, duration: number = 2.5, pos: 'center' | 'top-left' | 'top-right' = 'center', color: number = 0xffffff): void {
+    // Calculate combat area dimensions for centering (local to combatRoot)
     const padding = 20;
-    const enemyAreaX = this.leftW + padding;
-    const adPanelX = this.app.screen.width - this.adPanelW - padding;
+    const enemyAreaX = 0; 
+    const adPanelX = this.rightW - this.adPanelW - padding;
     const enemyAreaW = adPanelX - enemyAreaX - padding;
  
     const toast = new Text({
       text: message,
       style: createTextStyle({
-        fontSize: isBig ? 18 : 14,
-        fill: 0xffd700,
-        stroke: { color: 0x000000, width: 4 },
+        fontSize: isBig ? 20 : 16,
+        fill: color,
+        fontWeight: '900',
+        stroke: { color: 0x000000, width: 4.5 },
+        dropShadow: { color: 0x000000, alpha: 0.4, blur: 4, distance: 2 },
         align: pos === 'center' ? 'center' : (pos === 'top-left' ? 'left' : 'right'),
-        padding: 4,
+        padding: 6,
       }),
       resolution: window.devicePixelRatio || 2,
     });
@@ -374,19 +372,19 @@ export class GameUI {
     
     if (pos === 'center') {
       toast.anchor.set(0.5, 0);
-      toast.x = enemyAreaX + enemyAreaW / 2;
+      toast.x = this.rightW / 2; // Exactly aligned with enemyNameText.x
       toast.y = labelY + baseOffset + stackOffset;
     } else if (pos === 'top-left') {
       toast.anchor.set(0, 0);
-      toast.x = enemyAreaX + 20;
+      toast.x = 25; // Balanced with relicStatusText.x
       toast.y = labelY + baseOffset + stackOffset;
     } else {
       toast.anchor.set(1, 0);
-      toast.x = adPanelX - 20;
+      toast.x = this.rightW - 25; // Balanced with mobProgressText.x
       toast.y = labelY + baseOffset + stackOffset;
     }
     
-    this.root.addChild(toast);
+    this.uiOverlay.addChild(toast); // Use uiOverlay instead of root
     this.activeToasts.push({ text: toast, timer: duration, pos });
   }
 
@@ -402,7 +400,6 @@ export class GameUI {
     this.skillBar.update(deltaSeconds);
     this.heroPanel.update(deltaSeconds);
     this.particleSystem.update(deltaSeconds);
-    AdManager.tick(deltaSeconds);
     this.adRewardsPanel.update(deltaSeconds);
  
     // Update relic status
@@ -487,7 +484,7 @@ export class GameUI {
       let progress = 0;
       const duration = 1.0; 
       const startX = -150;
-      const endX = window.innerWidth + 150;
+      const endX = this.rightW + 150; // Bound to rightW
       const delay = index * 0.15; // 150ms delay between heroes
       let elapsed = 0;
   
