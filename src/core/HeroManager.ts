@@ -1,12 +1,14 @@
-import { Decimal } from '../systems/BigNumber';
+import { Decimal, toBigNum } from '../systems/BigNumber';
 import { GameState } from './GameState';
 import { GoldManager } from './GoldManager';
 import { EventBus, Events } from '../systems/EventBus';
 import { BalanceConfig } from '../config/BalanceConfig';
 import { HERO_DATA } from '../config/HeroData';
+import { SKILL_DATA } from '../config/SkillData';
 import { AscensionManager } from './AscensionManager';
 import { AchievementManager } from './AchievementManager';
 import { RelicManager } from './RelicManager';
+import { AdManager } from '../integrations/AdManager';
 
 export const HeroManager = {
   getHeroCost(heroIndex: number): Decimal {
@@ -33,11 +35,12 @@ export const HeroManager = {
     const ascMult = AscensionManager.getDPSAscensionMult();
     const achMult = 1 + AchievementManager.getTotalRewardMult('dps_mult');
     const relicMult = 1 + RelicManager.getTotalBonus('dps_mult');
-    return total.mul(ascMult).mul(achMult).mul(relicMult);
+    const adMult = AdManager.getDPSMultiplier();
+    return total.mul(ascMult).mul(achMult).mul(relicMult).mul(adMult);
   },
 
   canBuyHero(heroIndex: number): boolean {
-    if (heroIndex === 0) return true; // Gigachad is always buyable
+    if (heroIndex === 0) return true; // Nous is always buyable
     const prevHeroState = GameState.heroes[heroIndex - 1];
     return prevHeroState.level > 0;
   },
@@ -57,8 +60,6 @@ export const HeroManager = {
       GameState.stats.herosBought += 1;
     }
 
-    // UPDATED: Recalculate DPS but REMOVED AchievementManager.checkAll() from hot path
-    // Achievements are checked periodically in GameUI.ts every 0.1s
     this.recalculateDPS();
 
     EventBus.emit(Events.HERO_BOUGHT, heroIndex, state.level);
@@ -66,10 +67,32 @@ export const HeroManager = {
   },
 
   recalculateDPS(): void {
+    const skillMult = HeroManager.getSkillDPSMultiplier();
+    GameState.dpsMultiplier = skillMult;
+    
     const rawDPS = HeroManager.getTotalDPS();
-    const effectiveDPS = rawDPS.mul(GameState.dpsMultiplier);
+    const effectiveDPS = rawDPS.mul(skillMult);
     GameState.totalDPS = effectiveDPS;
     EventBus.emit(Events.DPS_CHANGED, effectiveDPS);
+  },
+
+  getSkillDPSMultiplier(): Decimal {
+    let mult = toBigNum(1);
+    
+    // Check all active skills and combine their multipliers correctly
+    GameState.skills.forEach(s => {
+      if (!s.isActive) return;
+      
+      if (s.id === 'sigma_grindset') {
+        const idx = SKILL_DATA.findIndex(def => def.id === 'sigma_grindset');
+        const power = GameState.getSkillPower(idx);
+        mult = mult.mul(5 * power);
+      } else if (s.id === 'ohio_mode' && s.activeMultiplier) {
+        mult = mult.mul(s.activeMultiplier);
+      }
+    });
+
+    return mult;
   },
 
   unlockHero(heroIndex: number): void {
@@ -100,6 +123,6 @@ export const HeroManager = {
   },
 };
 
-// Periodic checks handled in UI loop
+// Periodic checks
 EventBus.on(Events.RELIC_DROPPED, () => { HeroManager.recalculateDPS(); });
 EventBus.on(Events.ACHIEVEMENT_UNLOCKED, () => { HeroManager.recalculateDPS(); });

@@ -7,6 +7,7 @@ import { AchievementManager } from './AchievementManager';
 import { HeroManager } from './HeroManager';
 import { RelicManager } from './RelicManager';
 import { AdManager } from '../integrations/AdManager';
+import { SKILL_DATA } from '../config/SkillData';
 
 export const GoldManager = {
   addGold(amount: Decimal): void {
@@ -43,12 +44,32 @@ export const GoldManager = {
     const achMult = 1 + AchievementManager.getTotalRewardMult('gold_mult');
     const relicMult = 1 + RelicManager.getTotalBonus('gold_mult');
     const adMult = AdManager.getGoldMultiplier();
+    const skillMult = GoldManager.getSkillGoldMultiplier();
     
-    // INCLUDE GameState.goldMultiplier (Rizz Aura, etc.)
-    return toBigNum(ascMult * achMult * relicMult * adMult).mul(GameState.goldMultiplier);
+    // Update GameState for UI tracking
+    GameState.goldMultiplier = skillMult;
+
+    return toBigNum(ascMult * achMult * relicMult * adMult).mul(skillMult);
+  },
+
+  getSkillGoldMultiplier(): Decimal {
+    let mult = toBigNum(1);
+    
+    // Check all active skills
+    GameState.skills.forEach(s => {
+      if (!s.isActive) return;
+      
+      if (s.id === 'rizz_aura') {
+        const idx = SKILL_DATA.findIndex(def => def.id === 'rizz_aura');
+        const power = GameState.getSkillPower(idx);
+        mult = mult.mul(10 * power);
+      }
+    });
+
+    return mult;
   },
 
   setMultiplier(multiplier: number): void {
-    GameState.goldMultiplier = toBigNum(multiplier);
+    // This is now legacy/unused as multipliers are calculated dynamically
   },
 };

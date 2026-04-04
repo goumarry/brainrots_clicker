@@ -99,13 +99,12 @@ export const SkillManager = {
           break;
   
         case 'sigma_grindset':
-          GameState.dpsMultiplier = GameState.dpsMultiplier.mul(5 * power);
           HeroManager.recalculateDPS();
           break;
-  
+   
         case 'ohio_mode': {
           const multiplier = (2 + Math.random() * 98) * power; 
-          GameState.dpsMultiplier = GameState.dpsMultiplier.mul(multiplier);
+          skill.activeMultiplier = multiplier;
           HeroManager.recalculateDPS();
           break;
         }
@@ -118,7 +117,7 @@ export const SkillManager = {
         }
   
         case 'rizz_aura':
-          GameState.goldMultiplier = GameState.goldMultiplier.mul(10 * power);
+          // GoldManager recalculates on the fly
           break;
   
         case 'gyatt_bomb': {
@@ -208,15 +207,11 @@ export const SkillManager = {
 
     switch (def.id) {
       case 'sigma_grindset':
-        GameState.dpsMultiplier = GameState.dpsMultiplier.div(5 * power);
-        HeroManager.recalculateDPS();
-        break;
       case 'ohio_mode':
-        GameState.dpsMultiplier = toBigNum(1);
         HeroManager.recalculateDPS();
         break;
       case 'rizz_aura':
-        GameState.goldMultiplier = GameState.goldMultiplier.div(10 * power);
+        // Automatic via recalculate from GoldManager
         break;
       case 'mewing_focus':
         GameState.critChance = 0.05; 

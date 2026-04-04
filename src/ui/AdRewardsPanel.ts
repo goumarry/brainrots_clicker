@@ -21,7 +21,7 @@ export class AdRewardsPanel {
 
   private readonly BTN_W = 100;
   private readonly BTN_H = 92;
-  private readonly GAP = 20;
+  private readonly GAP = 40;
 
   constructor(width: number, height: number = 540) {
     this.width = width;
@@ -90,11 +90,17 @@ export class AdRewardsPanel {
 
         const timerT = new Text({
             text: '',
-            style: createTextStyle({ fontSize: 16, fill: 0xffffff, fontWeight: 'bold' }),
+            style: createTextStyle({ 
+                fontSize: 18, 
+                fill: 0xffffff, 
+                fontWeight: '900',
+                stroke: { color: 0x000000, width: 4 },
+                dropShadow: { color: 0x000000, alpha: 0.4, blur: 4, distance: 2 }
+            }),
             resolution: window.devicePixelRatio || 2,
         });
         timerT.anchor.set(0.5, 1); 
-        timerT.position.set(this.BTN_W / 2, -5); 
+        timerT.position.set(this.BTN_W / 2, -1); 
         timerT.visible = false;
         btnCont.addChild(timerT);
 

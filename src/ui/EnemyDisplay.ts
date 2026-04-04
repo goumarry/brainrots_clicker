@@ -179,7 +179,8 @@ export class EnemyDisplay {
     const barH = this.bossBarH; 
     const barX = Math.floor((width - barW) / 2);
     // Floating higher above SkillBar (which is 120H)
-    this.hpBarY = Math.floor(height - 210); 
+    // Lowered HP bar position (was height - 210)
+    this.hpBarY = Math.floor(height - 120); 
 
     this.hpBarBg = new Graphics();
     this.hpBarBg.roundRect(barX, this.hpBarY, barW, barH, 4).fill(0x1a1a1a);

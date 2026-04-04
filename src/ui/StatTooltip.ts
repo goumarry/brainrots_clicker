@@ -53,7 +53,7 @@ export class StatTooltip {
     this.container.addChild(this.contentText);
   }
 
-  show(breakdown: StatBreakdown, x: number, y: number): void {
+  show(breakdown: StatBreakdown, x: number, y: number, side: 'top' | 'bottom' = 'bottom'): void {
     this.titleText.text = breakdown.label;
     
     let content = `Base: ${this.formatVal(breakdown.base)}\n`;
@@ -76,8 +76,8 @@ export class StatTooltip {
     this.bg.fill({ color: 0x0a141f, alpha: 0.95 });
     this.bg.stroke({ color: 0x1e3a5f, width: 2 });
 
-    // Anchor at BOTTOM-CENTER
-    this.container.pivot.y = height;
+    // Anchor: 'bottom' means tooltip is ABOVE (pivot.y = height), 'top' means tooltip is BELOW (pivot.y = 0)
+    this.container.pivot.y = side === 'bottom' ? height : 0;
 
     this.container.x = x;
     this.container.y = y;

@@ -6,6 +6,8 @@ import { AscensionManager } from './AscensionManager';
 import { AdManager } from '../integrations/AdManager';
 import { HERO_DATA } from '../config/HeroData';
 import { Decimal, toBigNum } from '../systems/BigNumber';
+import { BalanceConfig } from '../config/BalanceConfig';
+import { GoldManager } from './GoldManager';
 
 export interface StatBreakdown {
   label: string;
@@ -89,7 +91,7 @@ export const StatCalculator = {
 
   getGoldBreakdown(): StatBreakdown {
     const zone = GameState.zone;
-    const baseVal = toBigNum(1.5).pow(zone - 1);
+    const baseVal = toBigNum(BalanceConfig.GOLD_ZONE_EXPONENT).pow(zone - 1);
     
     const breakdown: StatBreakdown = {
         label: `Or de la Zone ${zone}`,
@@ -97,7 +99,6 @@ export const StatCalculator = {
         multipliers: [],
         total: '',
     };
- 
 
     const achMult = 1 + AchievementManager.getTotalRewardMult('gold_mult');
     if (achMult > 1) breakdown.multipliers.push({ label: 'Achievements', value: achMult, type: 'mult' });
@@ -110,8 +111,15 @@ export const StatCalculator = {
 
     const adMult = AdManager.getGoldMultiplier();
     if (adMult > 1) breakdown.multipliers.push({ label: 'Pub Double Or', value: adMult, type: 'mult' });
+    
+    if (GameState.goldMultiplier.gt(1)) {
+        breakdown.multipliers.push({ label: 'Aura de Rizz', value: GameState.goldMultiplier, type: 'mult' });
+    }
 
-    const totalReward = baseVal.mul(achMult).mul(relicMult).mul(ascMult).mul(adMult).mul(GameState.goldMultiplier);
+    // Use shared logic for final total to ensure consistency (including floor)
+    const totalMult = GoldManager.getTotalMultiplier();
+    const totalReward = BalanceConfig.goldPerKill(zone, totalMult);
+    
     breakdown.total = totalReward;
     return breakdown;
   },

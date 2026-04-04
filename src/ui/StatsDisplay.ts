@@ -178,13 +178,14 @@ export class StatsDisplay {
         else if (type === 'gold') breakdown = StatCalculator.getGoldBreakdown();
         else breakdown = StatCalculator.getCritBreakdown();
         
-        // Center tooltip directly under the mouse
-        const localPos = this.overlay.toLocal(e.global);
-        // Clamping based on overlay width (total screen) instead of barWidth
-        const sw = window.innerWidth;
-        const tx = Math.max(120, Math.min(sw - 120, localPos.x));
-        const ty = this.barHeight + 15; 
-        this.tooltip.show(breakdown, tx, ty);
+        // GLOBAL POSITIONING: centered under the stat text
+        // Center tooltip directly under the stat text
+        const glPos = element.getGlobalPosition();
+        // Convert world to tooltip container local space
+        const parent = this.tooltip.container.parent || this.overlay;
+        const localPos = parent.toLocal(glPos);
+        
+        this.tooltip.show(breakdown, localPos.x, localPos.y + 25, 'top');
       });
       element.on('pointerout', () => this.tooltip.hide());
     };

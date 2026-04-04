@@ -21,6 +21,7 @@ export interface SkillSaveState {
   cooldownRemaining: number;
   durationRemaining: number;
   isActive: boolean;
+  activeMultiplier?: number;
 }
 
 export interface AscensionUpgradeState {
@@ -210,6 +211,7 @@ class GameStateClass {
         cooldownRemaining: saved?.cooldownRemaining ?? 0,
         durationRemaining: saved?.durationRemaining ?? 0,
         isActive: saved?.isActive ?? false,
+        activeMultiplier: saved?.activeMultiplier,
       };
     });
     

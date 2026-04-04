@@ -10,7 +10,7 @@ export const BalanceConfig = {
 
   // Gold
   BASE_GOLD: 2,
-  GOLD_ZONE_EXPONENT: 1.3,
+  GOLD_ZONE_EXPONENT: 1.4,
 
   // Hero
   HERO_COST_GROWTH: 1.15,

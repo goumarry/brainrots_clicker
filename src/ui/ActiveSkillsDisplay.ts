@@ -138,8 +138,7 @@ class ActiveSkillItem {
 
   private drawPremiumBorder(durationRemaining: number): void {
     this.bg.clear();
-    // Glassmorphism bg (No border)
-    this.bg.roundRect(0, 0, HUD_ITEM_SIZE, HUD_ITEM_SIZE, 12).fill({ color: 0x0a1018, alpha: 0.85 });
+    // Background removed as requested
   }
 
   destroy(): void {

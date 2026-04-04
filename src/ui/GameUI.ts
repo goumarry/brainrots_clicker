@@ -4,7 +4,6 @@ import { StatsDisplay } from './StatsDisplay';
 import { EnemyDisplay } from './EnemyDisplay';
 import { HeroPanel } from './HeroPanel';
 import { FloatingTextManager } from './FloatingText';
-import { SkillBar } from './SkillBar';
 import { TabBar, TabName } from './TabBar';
 import { AscensionScreen } from './screens/AscensionScreen';
 import { RelicScreen } from './screens/RelicScreen';
@@ -24,6 +23,7 @@ import { RelicInstance } from '../core/GameState';
 import { formatGold, formatDPS, formatNumber } from '../systems/NumberFormatter';
 import { AdManager } from '../integrations/AdManager';
 import { Decimal } from '../systems/BigNumber';
+import { HeroCombatDisplay } from './HeroCombatDisplay';
 import { ActiveSkillsDisplay } from './ActiveSkillsDisplay';
 import { HERO_DATA } from '../config/HeroData';
 import { EnemyManager } from '../core/EnemyManager';
@@ -36,9 +36,9 @@ export class GameUI {
   private enemyDisplay!: EnemyDisplay;
   private heroPanel!: HeroPanel;
   private floatingTextManager!: FloatingTextManager;
-  private skillBar!: SkillBar;
   private tabBar!: TabBar;
   private uiOverlay!: Container;
+  private tooltipLayer: Container = new Container();
   private combatRoot: Container = new Container();
 
   private ascensionScreen!: AscensionScreen;
@@ -48,11 +48,10 @@ export class GameUI {
 
   private particleSystem!: ParticleSystem;
   private adRewardsPanel!: AdRewardsPanel;
-
-  private activeTab: TabName = 'heroes';
-
-  private relicStatusText!: Text;
+  private heroCombatDisplay!: HeroCombatDisplay;
   private activeSkillsHUD!: ActiveSkillsDisplay;
+  private activeTab: TabName = 'heroes';
+  private relicStatusText!: Text;
   private activeToasts: { text: Text, timer: number, pos: 'center' | 'top-left' | 'top-right' }[] = [];
   private achTimer: number = 0.5;
 
@@ -100,6 +99,11 @@ export class GameUI {
     const th = this.topBarH;
     const aw = this.adPanelW;
     const shh = this.skillBarH;
+    
+    // 0. Global Tooltip Layer (Above everything)
+    // Initialize before components so they can add themselves to it
+    this.tooltipLayer = new Container();
+    // We will addChild(this.tooltipLayer) at the very end to ensure top-most layering
 
     // 1. Full background
     const bg = new Graphics();
@@ -186,30 +190,27 @@ export class GameUI {
     this.combatRoot.addChild(this.uiOverlay);
 
     // Stats bar (Top Overlay)
-    this.statsDisplay = new StatsDisplay(rw, this.uiOverlay, th);
+    this.statsDisplay = new StatsDisplay(rw, this.tooltipLayer, th);
     this.statsDisplay.container.x = 0;
     this.uiOverlay.addChild(this.statsDisplay.container);
 
     // Ad Rewards Panel (Right Overlay)
     const adPanelX = rw - aw - padding;
-    const adPanelY = th + padding + 60;
-    const adPanelH = sh - th - shh - 100;
+    const adPanelY = th + padding + 60; // Lowered from 20 to 60 for better centering with top bar
+    const adPanelH = sh - th - 120; // Expanded available height
     this.adRewardsPanel = new AdRewardsPanel(aw, adPanelH);
     this.adRewardsPanel.container.x = adPanelX;
     this.adRewardsPanel.container.y = adPanelY;
     this.uiOverlay.addChild(this.adRewardsPanel.container);
 
-    // Skill Bar (Bottom Overlay)
-    const skillBarY = sh - shh;
-    this.skillBar = new SkillBar(rw, this.uiOverlay);
-    this.skillBar.container.x = 0;
-    this.skillBar.container.y = skillBarY;
-    this.uiOverlay.addChild(this.skillBar.container);
+    // Hero Combat Display (Replaces bottom Skill Bar)
+    this.heroCombatDisplay = new HeroCombatDisplay(rw, sh, this.tooltipLayer);
+    this.uiOverlay.addChild(this.heroCombatDisplay.container);
 
-    // Active Skills HUD (Elevated to avoid overlap with Skill Bar)
+    // Active Skills HUD (Lowered from sh - shh - 85)
     this.activeSkillsHUD = new ActiveSkillsDisplay();
     this.activeSkillsHUD.container.x = 25;
-    this.activeSkillsHUD.container.y = sh - shh - 85; 
+    this.activeSkillsHUD.container.y = sh - 110; 
     this.uiOverlay.addChild(this.activeSkillsHUD.container);
 
     // Relic status text (Persistent label)
@@ -250,6 +251,9 @@ export class GameUI {
       const tutorial = new TutorialOverlay(sw, sh, () => {});
       this.root.addChild(tutorial.container);
     }
+    
+    // FINALLY: Add global tooltip layer as the last child to be on top of everything
+    this.root.addChild(this.tooltipLayer);
 
     // Space key listener
     window.addEventListener('keydown', (e) => {
@@ -397,7 +401,7 @@ export class GameUI {
       this.enemyDisplay.updateBossTimer(GameState.bossTimeRemaining, BalanceConfig.BOSS_TIMER_SECONDS);
     }
 
-    this.skillBar.update(deltaSeconds);
+    if (this.heroCombatDisplay) this.heroCombatDisplay.update(deltaSeconds);
     this.heroPanel.update(deltaSeconds);
     this.particleSystem.update(deltaSeconds);
     this.adRewardsPanel.update(deltaSeconds);
