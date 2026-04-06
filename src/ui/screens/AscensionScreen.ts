@@ -31,10 +31,10 @@ const BRANCH_ICONS: Record<AscensionBranch, string> = {
   chaos: '🌀',
 };
 
-const CARD_HEIGHT = 110;
-const PADDING = 10;
-const BTN_WIDTH = 120;
-const BTN_HEIGHT = 42;
+const CARD_HEIGHT = 140;
+const PADDING = 8;
+const BTN_WIDTH = 110;
+const BTN_HEIGHT = 34;
 
 interface AscensionCard {
   container: Container;
@@ -63,7 +63,6 @@ export class AscensionScreen {
   private cards: AscensionCard[] = [];
   private hoverId: string | null = null;
   private soulsText!: Text;
-  private pendingText!: Text;
   private reqText!: Text;
   private ascendBtn!: Graphics;
   private ascendBtnText!: Text;
@@ -132,27 +131,18 @@ export class AscensionScreen {
     this.soulsText.x = 20;
     this.soulsText.y = yOffset;
     this.scrollContainer.addChild(this.soulsText);
-    yOffset += 40;
-
-    // Potential Gain & Requirements
-    this.pendingText = new Text({
-      text: '',
-      style: createTextStyle({ fontSize: 15, fill: 0x8899aa }),
-      resolution: window.devicePixelRatio || 2,
-    });
-    this.pendingText.x = 20; yOffset += 2;
-    this.pendingText.y = yOffset;
-    this.scrollContainer.addChild(this.pendingText);
 
     this.reqText = new Text({
       text: '',
       style: createTextStyle({ fontSize: 14, fill: 0xff8844 }),
       resolution: window.devicePixelRatio || 2,
     });
-    this.reqText.anchor.set(1, 0); this.reqText.x = this.panelW - 20;
-    this.reqText.y = yOffset;
+    this.reqText.anchor.set(1, 0.5); 
+    this.reqText.x = this.panelW - 20;
+    this.reqText.y = yOffset + this.soulsText.height / 2;
     this.scrollContainer.addChild(this.reqText);
-    yOffset += 32;
+    
+    yOffset += 45;
 
     // Ascend button
     this.ascendBtn = new Graphics();
@@ -184,73 +174,81 @@ export class AscensionScreen {
     yOffset += 80;
 
     const branches: AscensionBranch[] = ['sigma', 'grind', 'speed', 'crit', 'chaos'];
+    const cardW = (this.panelW - PADDING * 3) / 2;
+
     for (const branch of branches) {
       const branchUpgrades = ASCENSION_UPGRADES.filter(u => u.branch === branch);
 
       const branchLabel = new Text({
         text: BRANCH_LABELS[branch],
-        style: createTextStyle({ fontSize: 22, fill: BRANCH_COLORS[branch], fontWeight: '900' }),
+        style: createTextStyle({ fontSize: 20, fill: BRANCH_COLORS[branch], fontWeight: '900' }),
         resolution: window.devicePixelRatio || 2,
       });
-      branchLabel.x = 20;
+      branchLabel.x = 15;
       branchLabel.y = yOffset;
       this.scrollContainer.addChild(branchLabel);
-      yOffset += 35;
+      yOffset += 32;
 
-      for (const upg of branchUpgrades) {
+      branchUpgrades.forEach((upg, index) => {
+        const col = index % 2;
+        const row = Math.floor(index / 2);
+
         const cardCont = new Container();
-        cardCont.x = PADDING;
-        cardCont.y = yOffset;
+        cardCont.x = PADDING + col * (cardW + PADDING);
+        cardCont.y = yOffset + row * (CARD_HEIGHT + PADDING);
         cardCont.eventMode = 'static';
         cardCont.cursor = 'pointer';
 
         const bg = new Graphics();
         cardCont.addChild(bg);
         
-        // Icon Background (Silhouettes style from HeroPanel)
+        // Icon Background
         const iconContainer = new Container();
         const iconMask = new Graphics();
-        iconMask.roundRect(0, 0, this.panelW - PADDING * 2, CARD_HEIGHT, 12).fill(0xffffff);
+        iconMask.roundRect(0, 0, cardW, CARD_HEIGHT, 10).fill(0xffffff);
         iconContainer.mask = iconMask;
         cardCont.addChild(iconMask);
         cardCont.addChild(iconContainer);
 
         const iconText = new Text({
           text: BRANCH_ICONS[upg.branch],
-          style: createTextStyle({ fontSize: 80, fill: 0xffffff }),
+          style: createTextStyle({ fontSize: 60, fill: 0xffffff }),
           resolution: window.devicePixelRatio || 2,
         });
         iconText.anchor.set(0.5);
-        iconText.x = this.panelW - 130;
-        iconText.y = CARD_HEIGHT / 2;
+        iconText.x = cardW * 0.85;
+        iconText.y = CARD_HEIGHT * 0.25;
         iconText.rotation = -Math.PI / 10;
         iconText.alpha = 0.08;
         iconContainer.addChild(iconText);
 
-        const nameT = new Text({ text: '', style: createTextStyle({ fontSize: 21, fill: 0xffffff, fontWeight: '900' }), resolution: 1.5 });
-        nameT.x = 20; nameT.y = 18;
+        const nameT = new Text({ text: '', style: createTextStyle({ fontSize: 16, fill: 0xffffff, fontWeight: '900' }), resolution: 1.5 });
+        nameT.x = 12; nameT.y = 12;
         cardCont.addChild(nameT);
 
-        const levelT = new Text({ text: '', style: createTextStyle({ fontSize: 13, fill: 0x999999 }), resolution: 1.5 });
-        levelT.y = 23; cardCont.addChild(levelT);
+        const levelT = new Text({ text: '', style: createTextStyle({ fontSize: 11, fill: 0x999999 }), resolution: 1.5 });
+        levelT.x = 12; levelT.y = 32;
+        cardCont.addChild(levelT);
 
-        const descT = new Text({ text: upg.description, style: createTextStyle({ fontSize: 14, fill: 0x8899aa }), resolution: 1.5 });
-        descT.x = 20; descT.y = 52;
+        const descT = new Text({ 
+          text: upg.description, 
+          style: createTextStyle({ fontSize: 11, fill: 0x8899aa, wordWrap: true, wordWrapWidth: cardW - 24 }), 
+          resolution: 1.5 
+        });
+        descT.x = 12; descT.y = 52;
         cardCont.addChild(descT);
 
-        const costGroup = new Container();
-        costGroup.x = this.panelW - PADDING * 2 - BTN_WIDTH - 15;
-        costGroup.y = CARD_HEIGHT - BTN_HEIGHT - 15;
-        cardCont.addChild(costGroup);
-
         const buyBtn = new Graphics();
+        buyBtn.x = (cardW - BTN_WIDTH) / 2;
+        buyBtn.y = CARD_HEIGHT - BTN_HEIGHT - 10;
         buyBtn.eventMode = 'none';
-        costGroup.addChild(buyBtn);
+        cardCont.addChild(buyBtn);
 
-        const costT = new Text({ text: '', style: createTextStyle({ fontSize: 16, fill: 0xffffff }), resolution: 1.5 });
+        const costT = new Text({ text: '', style: createTextStyle({ fontSize: 14, fill: 0xffffff }), resolution: 1.5 });
         costT.anchor.set(0.5);
-        costT.x = BTN_WIDTH / 2; costT.y = BTN_HEIGHT / 2;
-        costGroup.addChild(costT);
+        costT.x = buyBtn.x + BTN_WIDTH / 2; 
+        costT.y = buyBtn.y + BTN_HEIGHT / 2;
+        cardCont.addChild(costT);
 
         const cardObj: AscensionCard = {
           container: cardCont, bg, nameText: nameT, descText: descT,
@@ -280,10 +278,10 @@ export class AscensionScreen {
         this.scrollContainer.addChild(cardCont);
         this.cards.push(cardObj);
         this.updateCard(cardObj);
-
-        yOffset += CARD_HEIGHT + PADDING;
-      }
-      yOffset += 15;
+      });
+      
+      const rows = Math.ceil(branchUpgrades.length / 2);
+      yOffset += rows * (CARD_HEIGHT + PADDING) + 20;
     }
 
     this.totalContentH = yOffset + 30;
@@ -297,17 +295,18 @@ export class AscensionScreen {
     const isHovered = this.hoverId === upg.id;
     const maxed = upg.maxLevel !== undefined && level >= upg.maxLevel;
 
+    const cardW = (this.panelW - PADDING * 3) / 2;
     // Background & Stroke
-    card.bg.clear().roundRect(0, 0, this.panelW - PADDING * 2, CARD_HEIGHT, 12);
+    card.bg.clear().roundRect(0, 0, cardW, CARD_HEIGHT, 10);
     card.bg.fill(0x1a2433);
     const sColor = card.isPressed ? 0xffffff : (isHovered ? BRANCH_COLORS[upg.branch] : 0x3d4a60);
-    const sWidth = (card.isPressed || isHovered) ? 2.5 : 1.5;
-    card.bg.stroke({ color: sColor, width: sWidth, alpha: isHovered ? 1.0 : 0.6 });
+    const sWidth = (card.isPressed || isHovered) ? 2 : 1;
+    card.bg.stroke({ color: sColor, width: sWidth, alpha: isHovered ? 1.0 : 0.4 });
 
     // Texts
     card.nameText.text = upg.name;
-    card.levelText.text = upg.maxLevel !== undefined ? `${level}/${upg.maxLevel}` : `LVL ${level}`;
-    card.levelText.x = card.nameText.x + card.nameText.width + 10;
+    card.levelText.text = upg.maxLevel !== undefined ? `${level}/${upg.maxLevel}` : `Niveau ${level}`;
+    card.levelText.y = 30; // Positioned under name
     
     // Icon Highlight
     card.iconText.alpha = isHovered ? 0.15 : 0.08;
@@ -342,9 +341,6 @@ export class AscensionScreen {
 
     this.soulsText.text = `🌀 Sigma Souls: ${GameState.sigmaSouls}`;
     
-    this.pendingText.text = pendingSouls > 0 ? `✨ Gain: +${pendingSouls} souls` : `⏳ No rewards reached`;
-    this.pendingText.style.fill = pendingSouls > 0 ? 0x44ff88 : 0x8899aa;
-
     this.reqText.text = canAscend ? `✅ Milestone: BEATEN` : `🔒 Goal: Reach Zone ${milestoneTarget + 1}`;
     this.reqText.style.fill = canAscend ? 0x44ff88 : 0xff8844;
 

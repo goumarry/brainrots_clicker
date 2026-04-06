@@ -45,7 +45,7 @@ export const SKILL_DATA: SkillDefinition[] = [
     heroId: 'bananita_dolfinita',
     name: 'Ohio Mode',
     emoji: '🏴',
-    description: 'Random buff x2-x100 for 15s',
+    description: 'Randomly x5 DPS, Click, or Gold for 15s',
     cooldownSeconds: 600,
     durationSeconds: 15,
     color: 0xe74c3c,

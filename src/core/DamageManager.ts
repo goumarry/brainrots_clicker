@@ -20,6 +20,13 @@ export const DamageManager = {
       clickDmg = clickDmg.mul(10 * power);
     }
 
+    // OHIO MODE (Skill 3)
+    const ohioIdx = 3; // Skill index for ohio_mode
+    const ohioSkill = GameState.skills[ohioIdx];
+    if (ohioSkill?.isActive && ohioSkill.activeStat === 'click' && ohioSkill.activeMultiplier) {
+      clickDmg = clickDmg.mul(ohioSkill.activeMultiplier);
+    }
+
     const ascMult = AscensionManager.getClickAscensionMult();
     const achMult = 1 + AchievementManager.getTotalRewardMult('click_mult');
     const relicMult = 1 + RelicManager.getTotalBonus('click_mult');

@@ -87,7 +87,7 @@ export const HeroManager = {
         const idx = SKILL_DATA.findIndex(def => def.id === 'sigma_grindset');
         const power = GameState.getSkillPower(idx);
         mult = mult.mul(5 * power);
-      } else if (s.id === 'ohio_mode' && s.activeMultiplier) {
+      } else if (s.id === 'ohio_mode' && s.activeMultiplier && s.activeStat === 'dps') {
         mult = mult.mul(s.activeMultiplier);
       }
     });

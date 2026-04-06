@@ -103,9 +103,18 @@ export const SkillManager = {
           break;
    
         case 'ohio_mode': {
-          const multiplier = (2 + Math.random() * 98) * power; 
+          const stats = ['dps', 'click', 'gold'];
+          const chosen = stats[Math.floor(Math.random() * stats.length)];
+          const multiplier = 5 * power; 
           skill.activeMultiplier = multiplier;
-          HeroManager.recalculateDPS();
+          skill.activeStat = chosen;
+          
+          if (chosen === 'dps') {
+            HeroManager.recalculateDPS();
+          }
+
+          const label = chosen === 'dps' ? 'DPS' : (chosen === 'click' ? 'CLICK' : 'GOLD');
+          EventBus.emit(Events.FLOATING_TEXT, `OHIO MODE: x${multiplier} ${label}!`, window.innerWidth/2, window.innerHeight/2 - 100, 0xe74c3c);
           break;
         }
   

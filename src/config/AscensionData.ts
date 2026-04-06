@@ -33,8 +33,8 @@ export const ASCENSION_UPGRADES: AscensionUpgrade[] = [
   // CRIT PATH
   { id: 'crit_chance_1', branch: 'crit', name: 'Eagle Eye I', description: '+2% crit chance per level', cost: 2, effectValue: 0.02, effectType: 'crit_chance' },
   { id: 'crit_chance_2', branch: 'crit', name: 'Eagle Eye II', description: '+3% crit chance per level', cost: 15, effectValue: 0.03, effectType: 'crit_chance' },
-  { id: 'crit_damage_1', branch: 'crit', name: 'Critical Mass I', description: '+0.5x crit multiplier per level', cost: 5, effectValue: 0.5, effectType: 'crit_mult' },
-  { id: 'crit_damage_2', branch: 'crit', name: 'Critical Mass II', description: '+1x crit multiplier per level', cost: 30, effectValue: 1.0, effectType: 'crit_mult' },
+  { id: 'crit_damage_1', branch: 'crit', name: 'Critical Mass I', description: '+50% dégâts crit par niveau', cost: 5, effectValue: 0.5, effectType: 'crit_mult' },
+  { id: 'crit_damage_2', branch: 'crit', name: 'Critical Mass II', description: '+100% dégâts crit par niveau', cost: 30, effectValue: 1.0, effectType: 'crit_mult' },
 
   // CHAOS PATH
   { id: 'chaos_1', branch: 'chaos', name: 'Chaos Theory I', description: '+5% chance of double gold per level', cost: 3, effectValue: 0.05, effectType: 'chaos_proc' },

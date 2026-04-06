@@ -315,8 +315,8 @@ export class GameUI {
       this.particleSystem.spawnZoneCelebration(this.rightW / 2, this.screenH / 2);
     });
 
-    EventBus.on(Events.ENEMY_DIED, (_g, isBoss) => {
-        const color = (isBoss as boolean) ? 0xff4444 : 0x44ff88;
+    EventBus.on(Events.ENEMY_DIED, (_g, isBoss, enemyColor) => {
+        const color = (enemyColor !== undefined) ? (enemyColor as number) : ((isBoss as boolean) ? 0xff4444 : 0x44ff88);
         const count = (isBoss as boolean) ? 30 : 16;
         const scale = (isBoss as boolean) ? 10.5 : 7.5;
         this.particleSystem.spawnKillBurst(this.rightW / 2, this.screenH / 2, color, count, scale, 3.0);
@@ -470,11 +470,20 @@ export class GameUI {
   }
   private animateHeroSkill(heroIds: string[], _skillId: string, damage: any): void {
     let hitTriggered = false;
- 
+    const sunPos = EnemyDisplay.getSunPos(GameState.zone, this.rightW);
+
     heroIds.forEach((heroId, index) => {
       const hero = HERO_DATA.find(h => h.id === heroId);
       if (!hero || !hero.image) return;
   
+      const shadow = Sprite.from(hero.image);
+      shadow.anchor.set(0.5);
+      shadow.scale.set(1.1);
+      shadow.tint = 0x000000;
+      shadow.alpha = 0.25;
+      shadow.zIndex = 4999;
+      this.uiOverlay.addChild(shadow);
+
       const sprite = Sprite.from(hero.image);
       sprite.anchor.set(0.5);
       sprite.scale.set(1.1);
@@ -502,6 +511,16 @@ export class GameUI {
           sprite.x = startX + (endX - startX) * progress;
           sprite.rotation = 0.1 * Math.sin(progress * 10);
   
+          // Sync shadow with sun
+          const relSunX = sunPos.x - sprite.x;
+          const relSunY = sunPos.y - sprite.y;
+          const shadowX = -relSunX * 0.1;
+          const shadowY = -relSunY * 0.1;
+          shadow.x = sprite.x + shadowX;
+          shadow.y = sprite.y + shadowY;
+          shadow.rotation = sprite.rotation;
+          shadow.scale.set(sprite.scale.x * 0.95);
+
           // Trigger impact when the FIRST hero reaches the center
           if (index === 0 && !hitTriggered && sprite.x >= this.enemyCenterX) {
               hitTriggered = true;
@@ -515,7 +534,9 @@ export class GameUI {
           if (progress >= 1) {
               this.app.ticker.remove(ticker);
               this.uiOverlay.removeChild(sprite);
+              this.uiOverlay.removeChild(shadow);
               sprite.destroy();
+              shadow.destroy();
           }
       };
       this.app.ticker.add(ticker);

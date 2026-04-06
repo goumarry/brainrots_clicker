@@ -54,6 +54,24 @@ function getEnemyName(zone: number, isBoss: boolean): string {
   return names[Math.floor(Math.random() * names.length)];
 }
 
+const PROCEDURAL_COLORS = [0x4a9eff, 0xff4a9e, 0x9eff4a, 0xffd700, 0x8a2be2];
+
+function getEnemyColor(zone: number, isBoss: boolean): number {
+  if (isBoss) {
+    const isMilestoneBoss = zone === 1 || zone % 10 === 0;
+    if (isMilestoneBoss) {
+      return 0x000000; // Black for PNG/Milestone bosses
+    }
+    // Intermediate/Procedural bosses are darker variants
+    let color = PROCEDURAL_COLORS[Math.floor(Math.random() * PROCEDURAL_COLORS.length)];
+    const r = ((color >> 16) & 0xff) >> 1;
+    const g = ((color >> 8) & 0xff) >> 1;
+    const b = (color & 0xff) >> 1;
+    return (r << 16) | (g << 8) | b;
+  }
+  return PROCEDURAL_COLORS[Math.floor(Math.random() * PROCEDURAL_COLORS.length)];
+}
+
 export const EnemyManager = {
   spawnEnemy(): void {
     const zone = GameState.zone;
@@ -70,6 +88,7 @@ export const EnemyManager = {
       maxHP,
       isBoss,
       killCount: 0,
+      color: getEnemyColor(zone, isBoss),
     };
 
     if (isBoss) {
@@ -107,7 +126,7 @@ export const EnemyManager = {
     }
 
     const goldEarned = GoldManager.awardKillGold(zone, isBoss);
-    EventBus.emit(Events.ENEMY_DIED, goldEarned, isBoss);
+    EventBus.emit(Events.ENEMY_DIED, goldEarned, isBoss, enemy.color);
 
     AudioManager.playDeathSound();
 
@@ -150,6 +169,7 @@ export const EnemyManager = {
           maxHP,
           isBoss: true,
           killCount: GameState.enemyKillCount,
+          color: getEnemyColor(zone, true),
         };
         GameState.bossTimerActive = true;
         GameState.bossTimeRemaining = BalanceConfig.BOSS_TIMER_SECONDS;
@@ -170,9 +190,10 @@ export const EnemyManager = {
       GameState.currentEnemy = {
         name: 'ALL CLEAR',
         currentHP: toBigNum(0),
-        maxHP: toBigNum(0),
+        maxHP: toBigNum(10),
         isBoss: false,
         killCount: 0,
+        color: 0x4a9eff,
       };
       EventBus.emit(Events.ENEMY_SPAWNED, GameState.currentEnemy);
       return;
@@ -186,6 +207,7 @@ export const EnemyManager = {
       maxHP,
       isBoss: false,
       killCount: GameState.enemyKillCount,
+      color: getEnemyColor(zone, false),
     };
 
     EventBus.emit(Events.ENEMY_SPAWNED, GameState.currentEnemy);
@@ -215,6 +237,7 @@ export const EnemyManager = {
       maxHP,
       isBoss: false,
       killCount: 0,
+      color: getEnemyColor(zone, false),
     };
 
     EventBus.emit(Events.ENEMY_SPAWNED, GameState.currentEnemy);

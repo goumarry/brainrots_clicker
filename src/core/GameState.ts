@@ -14,6 +14,7 @@ export interface EnemyState {
   maxHP: Decimal;
   isBoss: boolean;
   killCount: number;
+  color: number;
 }
 
 export interface SkillSaveState {
@@ -22,6 +23,7 @@ export interface SkillSaveState {
   durationRemaining: number;
   isActive: boolean;
   activeMultiplier?: number;
+  activeStat?: string;
 }
 
 export interface AscensionUpgradeState {
@@ -96,6 +98,7 @@ class GameStateClass {
     maxHP: toBigNum(10),
     isBoss: false,
     killCount: 0,
+    color: 0x4a9eff,
   };
 
   // Heroes
@@ -212,6 +215,7 @@ class GameStateClass {
         durationRemaining: saved?.durationRemaining ?? 0,
         isActive: saved?.isActive ?? false,
         activeMultiplier: saved?.activeMultiplier,
+        activeStat: saved?.activeStat,
       };
     });
     

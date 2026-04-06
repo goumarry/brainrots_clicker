@@ -124,33 +124,58 @@ export const StatCalculator = {
     return breakdown;
   },
 
-  getTotalCritChance(): number {
+  getRawTotalCritChance(): number {
     const achAdd = AchievementManager.getTotalRewardMult('crit_chance');
     const relicAdd = RelicManager.getTotalBonus('crit_chance');
     const ascAdd = AscensionManager.getCritChanceBonus();
-    const total = GameState.critChance + achAdd + relicAdd + ascAdd;
-    return Math.min(0.95, total);
+    return GameState.critChance + achAdd + relicAdd + ascAdd;
+  },
+
+  getEffectiveCritChance(): number {
+    return Math.min(1.0, this.getRawTotalCritChance());
+  },
+
+  getTotalCritMultiplier(): number {
+    const baseMult = GameState.critMultiplier + AscensionManager.getCritMultBonus();
+    const rawChance = this.getRawTotalCritChance();
+    const overflow = Math.max(0, rawChance - 1.0);
+    // 1% surplus crit = 1% extra crit damage (e.g. +0.01 to the multiplier)
+    return baseMult + overflow;
   },
 
   getCritBreakdown(): StatBreakdown {
+    const rawTotal = this.getRawTotalCritChance();
+    const effective = this.getEffectiveCritChance();
+    const totalMult = this.getTotalCritMultiplier();
+    const overflow = Math.max(0, rawTotal - 1.0);
+
     const breakdown: StatBreakdown = {
-      label: 'Taux Critique (Crit)',
-      base: `${(GameState.critChance * 100).toFixed(1)}%`,
+      label: 'Système Critique',
+      base: `${(GameState.critChance * 100).toFixed(1)}% Chance`,
       multipliers: [],
-      total: '',
+      total: `${(effective * 100).toFixed(1)}% Chance`,
     };
 
     const achAdd = AchievementManager.getTotalRewardMult('crit_chance');
-    if (achAdd > 0) breakdown.multipliers.push({ label: 'Achievements', value: `+${(achAdd * 100).toFixed(1)}%`, type: 'add' });
+    if (achAdd > 0) breakdown.multipliers.push({ label: 'Bonus Achievements', value: `+${(achAdd * 100).toFixed(1)}%`, type: 'add' });
 
     const relicAdd = RelicManager.getTotalBonus('crit_chance');
-    if (relicAdd > 0) breakdown.multipliers.push({ label: 'Reliques', value: `+${(relicAdd * 100).toFixed(1)}%`, type: 'add' });
+    if (relicAdd > 0) breakdown.multipliers.push({ label: 'Bonus Reliques', value: `+${(relicAdd * 100).toFixed(1)}%`, type: 'add' });
 
     const ascAdd = AscensionManager.getCritChanceBonus();
-    if (ascAdd > 0) breakdown.multipliers.push({ label: 'Ascension', value: `+${(ascAdd * 100).toFixed(1)}%`, type: 'add' });
+    if (ascAdd > 0) breakdown.multipliers.push({ label: 'Bonus Ascension', value: `+${(ascAdd * 100).toFixed(1)}%`, type: 'add' });
 
-    const total = this.getTotalCritChance();
-    breakdown.total = `${(total * 100).toFixed(1)}%`;
+    breakdown.multipliers.push({ label: '──────────────', value: '', type: 'add' });
+    breakdown.multipliers.push({ label: 'Dégâts Crit Base', value: `${(GameState.critMultiplier * 100).toFixed(0)}%`, type: 'add' });
+    
+    const ascMult = AscensionManager.getCritMultBonus();
+    if (ascMult > 0) breakdown.multipliers.push({ label: 'Bonus Ascension', value: `+${(ascMult * 100).toFixed(0)}%`, type: 'add' });
+
+    if (overflow > 0) {
+      breakdown.multipliers.push({ label: 'Surplus Critique', value: `+${(overflow * 100).toFixed(1)}%`, type: 'add' });
+    }
+
+    breakdown.total = `${(effective * 100).toFixed(1)}% Chance / ${(totalMult * 100).toFixed(0)}% Dégâts`;
     return breakdown;
   }
 };

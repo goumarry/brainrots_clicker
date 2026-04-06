@@ -63,6 +63,8 @@ export const GoldManager = {
         const idx = SKILL_DATA.findIndex(def => def.id === 'rizz_aura');
         const power = GameState.getSkillPower(idx);
         mult = mult.mul(10 * power);
+      } else if (s.id === 'ohio_mode' && s.activeStat === 'gold' && s.activeMultiplier) {
+        mult = mult.mul(s.activeMultiplier);
       }
     });
 

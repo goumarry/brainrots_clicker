@@ -7,19 +7,14 @@ import { formatNumber } from '../systems/NumberFormatter';
 import { AscensionManager } from './AscensionManager';
 import { AchievementManager } from './AchievementManager';
 import { RelicManager } from './RelicManager';
+import { StatCalculator } from './StatCalculator';
 import { AudioManager } from '../systems/AudioManager';
 
 export const ClickManager = {
   handleClick(x: number, y: number): Decimal {
     const baseDamage = DamageManager.getClickDamage();
-    const effectiveCritChance = Math.min(
-      0.95,
-      GameState.critChance
-      + AscensionManager.getCritChanceBonus()
-      + AchievementManager.getTotalRewardMult('crit_chance')
-      + RelicManager.getTotalBonus('crit_chance')
-    );
-    const effectiveCritMult = GameState.critMultiplier + AscensionManager.getCritMultBonus();
+    const effectiveCritChance = StatCalculator.getEffectiveCritChance();
+    const effectiveCritMult = StatCalculator.getTotalCritMultiplier();
     const isCrit = Math.random() < effectiveCritChance;
     const damage = isCrit ? baseDamage.mul(effectiveCritMult) : baseDamage;
     GameState.totalClicks += 1;

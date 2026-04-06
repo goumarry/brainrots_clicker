@@ -384,17 +384,60 @@ export class EnemyDisplay {
     this.groundLayer.rect(0, skyH, w, h - skyH).fill(groundColor);
     this.groundLayer.rect(0, h - 60, w, 60).fill({ color: 0x000000, alpha: 0.1 }); 
     
+    // Add ground texture variation (dirt/grass paths)
+    for (let i = 0; i < 8; i++) {
+        const ph = 4 + Math.random() * 14;
+        const pw = 60 + Math.random() * 140;
+        const px = Math.random() * (w - pw);
+        const py = skyH + 10 + Math.random() * (h - skyH - 40);
+        this.groundLayer.rect(px, py, pw, ph).fill({ color: 0x000000, alpha: 0.07 });
+    }
+
     this.drawSunMoon(sunColor, stage);
-    [0.15, 0.42, 0.68, 0.92].forEach(p => this.drawPine(this.midLayer, w * p, skyH + 5, 0.7 + Math.random() * 0.4));
+    // Denser Pine & Oak Forest
+    [0.08, 0.45, 0.83].forEach(p => this.drawPine(this.midLayer, w * p, skyH + 5, 0.6 + Math.random() * 0.3));
+    [0.25, 0.65, 0.95].forEach(p => this.drawOak(this.midLayer, w * p, skyH + 5, 0.7 + Math.random() * 0.4));
+    [0.15, 0.55].forEach(p => this.drawPine(this.midLayer, w * p, skyH + 5, 0.9 + Math.random() * 0.4));
     
-    for (let i = 0; i < 25; i++) {
-        const gx = Math.random() * w; const gy = skyH + 5 + Math.random() * (h - skyH - 15);
+    // Large rock density
+    for (let i = 0; i < 8; i++) {
+        const rx = Math.random() * w; const ry = skyH + 15 + Math.random() * (h - skyH - 40);
+        this.detailLayer.circle(rx, ry, 12 + Math.random()*15).fill(0x555555);
+        this.detailLayer.circle(rx + 8, ry + 5, 6 + Math.random()*5).fill(0x666666);
+    }
+
+    for (let i = 0; i < 110; i++) {
+        const gx = Math.random() * w; const gy = skyH + 5 + Math.random() * (h - skyH - 25);
         const r = Math.random();
-        if (r > 0.8) { this.detailLayer.circle(gx, gy, 8 + Math.random()*12).fill(0x777777); }
-        else if (r > 0.6) { this.detailLayer.circle(gx, gy, 15).fill(0x1b5e20); }
-        else {
-            this.detailLayer.poly([gx-3, gy, gx, gy-8, gx+3, gy]).fill({ color: 0x4caf50, alpha: 0.8 });
-            if (stage < 8 && Math.random() > 0.6) this.detailLayer.circle(gx, gy-10, 2.5).fill([0xffffff, 0xff4081][Math.floor(Math.random()*2)]);
+        
+        if (r > 0.85) { 
+            // Bushes with variations
+            this.detailLayer.circle(gx, gy, 14 + Math.random()*12).fill(0x1b5e20); 
+            if (Math.random() > 0.5) this.detailLayer.circle(gx+8, gy+4, 8).fill(0x1a4524);
+        } else if (r > 0.8) {
+            // Mushrooms
+            this.detailLayer.rect(gx-2, gy-4, 4, 8).fill(0xffffff); // Stem
+            this.detailLayer.circle(gx, gy-6, 6).fill(0xf44336); // Red cap
+            this.detailLayer.circle(gx-2, gy-7, 1.5).fill(0xffffff); // Dot
+            this.detailLayer.circle(gx+2, gy-5, 1).fill(0xffffff); // Dot
+        } else {
+            // Grass & Diverse Flowers
+            const colors = [0xffffff, 0xff4081, 0xffeb3b, 0x00bcd4, 0x9c27b0, 0xff9800, 0x4fc3f7];
+            const col = colors[Math.floor(Math.random() * colors.length)];
+            const gH = 10 + Math.random() * 8;
+            this.detailLayer.poly([gx-3, gy, gx, gy-gH, gx+3, gy]).fill({ color: 0x4caf50, alpha: 0.95 });
+            
+            // Only draw flowers in non-night stages
+            if (stage < 8 && Math.random() > 0.4) {
+                // Larger flowers with a core
+                const r = 5 + Math.random() * 1.5;
+                this.detailLayer.circle(gx, gy - gH - 2, r).fill(col);
+                this.detailLayer.circle(gx, gy - gH - 2, r * 0.4).fill(0xffeb3b); // Yellow center
+                if (Math.random() > 0.7) {
+                    this.detailLayer.circle(gx + 6, gy - gH + 2, r * 0.7).fill(col);
+                    this.detailLayer.circle(gx + 6, gy - gH + 2, r * 0.3).fill(0xffeb3b);
+                }
+            }
         }
     }
   }
@@ -405,10 +448,21 @@ export class EnemyDisplay {
     this.distantLayer.circle(sunX, sunY, r * 1.5).fill({ color, alpha: 0.15 }).circle(sunX, sunY, r).fill(color);
   }
 
-  private drawPine(g: Graphics, x: number, y: number, scale: number): void {
+  private drawOak(graphics: Graphics, x: number, y: number, scale: number): void {
+    const trunkW = 12 * scale;
+    const trunkH = 30 * scale;
+    // Trunk
+    graphics.rect(x - trunkW/2, y - trunkH, trunkW, trunkH).fill(0x5d4037);
+    // Layers of leaves
+    graphics.circle(x, y - trunkH - 12*scale, 25 * scale).fill(0x2e7d32);
+    graphics.circle(x - 15*scale, y - trunkH - 5*scale, 16 * scale).fill(0x1b5e20);
+    graphics.circle(x + 15*scale, y - trunkH - 5*scale, 16 * scale).fill(0x388e3c);
+  }
+
+  private drawPine(graphics: Graphics, x: number, y: number, scale: number): void {
     const twist = (Math.random()-0.5)*5;
-    g.rect(x - 6*scale, y, 12*scale, 28*scale).fill(0x3e2723);
-    g.poly([x-45*scale+twist, y, x+45*scale+twist, y, x, y-65*scale]).fill(0x1b5e20);
+    graphics.rect(x - 6*scale, y, 12*scale, 28*scale).fill(0x3e2723);
+    graphics.poly([x-45*scale+twist, y, x+45*scale+twist, y, x, y-65*scale]).fill(0x1b5e20);
   }
 
   private drawProceduralCloud(g: Graphics, x: number, y: number, scale: number): void {
@@ -432,8 +486,15 @@ export class EnemyDisplay {
         const hero = HERO_DATA[heroIdx];
         if (hero && hero.image) {
             const s = Sprite.from(hero.image); s.anchor.set(0.5); s.width = 380; s.height = 380;
-            const shadow = Sprite.from(hero.image); shadow.anchor.set(0.5); shadow.width = 380; shadow.height = 380;
-            shadow.tint = 0x000000; shadow.alpha = 0.3; shadow.position.set(25, 25);
+
+            const sunPos = EnemyDisplay.getSunPos(GameState.zone, this.areaW);
+            const relSunX = sunPos.x - this.enemyIconContainer.x;
+            const relSunY = sunPos.y - this.enemyIconContainer.y;
+            const shadowX = -relSunX * 0.1;
+            const shadowY = -relSunY * 0.1;
+
+            const shadow = Sprite.from(hero.image); shadow.anchor.set(0.5); shadow.width = 360; shadow.height = 360; // Slightly smaller than 380
+            shadow.tint = 0x000000; shadow.alpha = 0.25; shadow.position.set(shadowX, shadowY);
             this.enemyIconContainer.addChild(shadow, s);
             this.currentSprite = s;
         } else this.generateProcedural(name, true, false, false); // Fallback
@@ -446,17 +507,12 @@ export class EnemyDisplay {
   }
 
   private generateProcedural(name: string, isBoss: boolean, isSpecial: boolean, isMiniBoss: boolean = false): void {
-    const colors = [0x4a9eff, 0xff4a9e, 0x9eff4a, 0xffd700, 0x8a2be2];
-    let color = colors[Math.floor(Math.random() * colors.length)];
-    
-    // Mini-bosses are darker variants
-    if (isMiniBoss) {
-      // Very crude darken: divide components by 2
-      const r = ((color >> 16) & 0xff) >> 1;
-      const g = ((color >> 8) & 0xff) >> 1;
-      const b = (color & 0xff) >> 1;
-      color = (r << 16) | (g << 8) | b;
-    }
+    const color = GameState.currentEnemy.color;
+    const sunPos = EnemyDisplay.getSunPos(GameState.zone, this.areaW);
+    const relSunX = sunPos.x - this.enemyIconContainer.x;
+    const relSunY = sunPos.y - this.enemyIconContainer.y;
+    const shadowX = -relSunX * 0.08;
+    const shadowY = -relSunY * 0.08;
 
     let size = 120 + Math.random() * 60; 
     if (isSpecial) size *= 2.4; 
@@ -465,10 +521,11 @@ export class EnemyDisplay {
     const shapeType = Math.floor(Math.random() * 3); const sOff = size * 0.12;
 
     const sg = this.enemyShadow; sg.clear();
-    const sAlpha = 0.3; const sCol = 0x000000;
-    if (shapeType === 0) sg.circle(sOff, sOff, size).fill({ color: sCol, alpha: sAlpha });
-    else if (shapeType === 1) sg.roundRect(-size + sOff, -size + sOff, size * 2, size * 2, 20).fill({ color: sCol, alpha: sAlpha });
-    else sg.poly([sOff, -size+sOff, size+sOff, -size/2+sOff, size+sOff, size/2+sOff, sOff, size+sOff, -size+sOff, size/2+sOff, -size+sOff, -size/2+sOff]).fill({ color: sCol, alpha: sAlpha });
+    const sAlpha = 0.25; const sCol = 0x000000;
+    const sSize = size * 0.95;
+    if (shapeType === 0) sg.circle(shadowX, shadowY, sSize).fill({ color: sCol, alpha: sAlpha });
+    else if (shapeType === 1) sg.roundRect(-sSize + shadowX, -sSize + shadowY, sSize * 2, sSize * 2, 20).fill({ color: sCol, alpha: sAlpha });
+    else sg.poly([shadowX, -sSize+shadowY, sSize+shadowX, -sSize/2+shadowY, sSize+shadowX, sSize/2+shadowY, shadowX, sSize+shadowY, -sSize+shadowX, sSize/2+shadowY, -sSize+shadowX, -sSize/2+shadowY]).fill({ color: sCol, alpha: sAlpha });
     
     const bg = this.enemyBody; bg.clear();
     const bodyCol = isSpecial ? 0x000000 : color;
@@ -613,5 +670,14 @@ export class EnemyDisplay {
 
     // Foreground Plants swaying
     this.fgPlants.forEach((p, i) => { p.skew.x = Math.sin(this.floatTime * 0.6 + i) * 0.08; });
+  }
+
+  public static getSunPos(zone: number, areaW: number): { x: number, y: number } {
+    const cyclePos = ((zone - 1) % 50); 
+    const stage = Math.floor(cyclePos / 5); 
+    return {
+      x: areaW - 85,
+      y: 75 + (stage * 20)
+    };
   }
 }

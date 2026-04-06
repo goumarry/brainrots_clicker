@@ -163,8 +163,9 @@ export class StatsDisplay {
     this.goldMultText.text = `💰 ${formatNumber(goldBreakdown.total as Decimal)}`;
 
     // Crit
-    const totalCrit = StatCalculator.getTotalCritChance();
-    this.critText.text = `🎯 ${(totalCrit * 100).toFixed(1)}%`;
+    const totalCrit = StatCalculator.getEffectiveCritChance();
+    const rawCrit = StatCalculator.getRawTotalCritChance();
+    this.critText.text = `🎯 ${(totalCrit * 100).toFixed(1)}%${rawCrit > 1.0 ? '+' : ''}`;
 
     this.soulsText.text = `🌀 ${GameState.sigmaSouls}`;
   }
